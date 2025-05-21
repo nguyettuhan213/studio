@@ -26,11 +26,10 @@ const HandleMissingDetailsInputSchema = z.object({
     .describe('Any special requirements for the booking (e.g., Projector, whiteboard).'),
   target_email: z
     .string()
-    .email()
     .optional()
     .describe('The target email address for booking confirmations.'),
-  cc_email: z.string().email().optional().describe('The CC email address for booking confirmations.'),
-  requestorMail: z.string().email().describe('The email address of the requestor.'),
+  cc_email: z.string().optional().describe('The CC email address for booking confirmations.'),
+  requestorMail: z.string().describe('The email address of the requestor.'),
   requestorMSSV: z.string().describe('The student ID of the requestor.'),
   requestorRole: z.string().describe('The role of the requestor (e.g., Chưởng ban).'),
   requestorDept: z.string().describe('The department of the requestor (e.g., Khoa Khoa học).'),

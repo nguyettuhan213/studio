@@ -1,6 +1,6 @@
 // src/app/actions.ts
 'use server';
-
+import {z} from 'genkit';
 import {
   extractBookingDetails,
   type ExtractBookingDetailsInput,
@@ -22,6 +22,9 @@ export type { ExtractBookingDetailsOutput as ParsedBookingDetails };
 export type { HandleMissingDetailsOutput as MissingDetailsResponse };
 export type { AssessRequestValidityOutput as ValidityResponse };
 
+type ParsedBookingDetails = ExtractBookingDetailsOutput;
+type MissingDetailsResponse = HandleMissingDetailsOutput;
+type ValidityResponse = AssessRequestValidityOutput;
 
 export async function getInitialBotMessage(): Promise<string> {
     // You can customize this initial message
@@ -56,7 +59,22 @@ export async function processUserMessage(
     // Ensure all fields defined in ParsedBookingDetails (ExtractBookingDetailsOutput) are present,
     // even if they are empty strings or default values from the AI.
     // Zod default() in schema or AI prompt should handle this.
-    const defaultsFromSchema = ExtractBookingDetailsOutput.parse({}); // Get defaults if schema defines them
+    const defaultsFromSchema = z.object({
+      room: z.string().describe('The room requested for booking.'),
+      date: z.string().describe('The date for the booking, preferably in ISO 8601 format (e.g., 2025-04-01).'),
+      time: z.string().describe('The time range for the booking as a human-readable string (e.g., 10:30 AM - 12:30 PM GMT+7).'),
+      purpose: z.string().describe('The purpose of the booking (e.g., Weekly AI workshop).'),
+      estimated_number_of_attendees: z.number().describe('The estimated number of attendees.'),
+      special_requirements: z.string().describe('Any special requirements for the booking (e.g., Projector, whiteboard, and access to power outlets).'),
+      target_email: z.string().describe('Recipient email for request confirmation or processing.'),
+      cc_email: z.string().optional().describe('Optional CC email address for the booking confirmation.'),
+      requestorMail: z.string().describe('The email of the person requesting.'),
+      requestorMSSV: z.string().describe('The student ID (MSSV) of the person requesting.'),
+      requestorRole: z.string().describe('The role of the person requesting in their club or organization (e.g., Chưởng ban).'),
+      requestorDept: z.string().describe('The department or faculty of the person requesting (e.g., Khoa Khoa học).'),
+      CLB: z.string().describe('The club or organization name (CLB) making the request (e.g., Edtech).'),
+      requestorName: z.string().describe('The full name of the person requesting.'),
+    }).parse({}); // Get defaults if schema defines them
     Object.keys(defaultsFromSchema).forEach(key => {
       const typedKey = key as keyof ParsedBookingDetails;
       if (updatedDetails[typedKey] === undefined) {
