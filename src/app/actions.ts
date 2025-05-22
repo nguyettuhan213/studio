@@ -74,7 +74,7 @@ export async function processUserMessage(
       requestorDept: z.string().describe('The department or faculty of the person requesting (e.g., Khoa Khoa học).'),
       CLB: z.string().describe('The club or organization name (CLB) making the request (e.g., Edtech).'),
       requestorName: z.string().describe('The full name of the person requesting.'),
-    }).parse({}); // Get defaults if schema defines them
+ }).parse(newlyExtracted); // Get defaults if schema defines them
     Object.keys(defaultsFromSchema).forEach(key => {
       const typedKey = key as keyof ParsedBookingDetails;
       if (updatedDetails[typedKey] === undefined) {
