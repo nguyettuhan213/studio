@@ -16,6 +16,7 @@ import {
   type AssessRequestValidityInput,
   type AssessRequestValidityOutput,
 } from '@/ai/flows/assess-request-validity';
+import { saveBookingDetailsToFirestore } from '@/services/booking-service'; // Added import
 
 // Re-export AI types for client-side usage if needed, or define specific types for actions
 export type { ExtractBookingDetailsOutput as ParsedBookingDetails };
@@ -58,7 +59,6 @@ export async function processUserMessage(
     
     // Ensure all fields defined in ParsedBookingDetails (ExtractBookingDetailsOutput) are present,
     // even if they are empty strings or default values from the AI.
-    // Zod default() in schema or AI prompt should handle this.
     const defaultsFromSchema = z.object({
       room: z.string().describe('The room requested for booking.'),
       date: z.string().describe('The date for the booking, preferably in ISO 8601 format (e.g., 2025-04-01).'),
@@ -114,6 +114,7 @@ export async function submitBookingRequest(
 ): Promise<{
   validityResponse: ValidityResponse;
   aiMessage: string;
+  bookingId?: string; // Optional: return bookingId on success
   error?: string;
 }> {
   try {
@@ -121,14 +122,27 @@ export async function submitBookingRequest(
     const validityResponse = await assessRequestValidity(validityInput);
 
     let aiMessage = "";
+    let bookingId: string | undefined = undefined;
+
     if (validityResponse.isValid) {
-      aiMessage = "Great! Your booking request has been submitted successfully. You should receive a confirmation via email shortly.";
-      // TODO: Implement actual submission logic (e.g., send email, log to DB)
+      try {
+        bookingId = await saveBookingDetailsToFirestore(finalDetails);
+        aiMessage = `Great! Your booking request (ID: ${bookingId}) has been saved successfully and is pending confirmation. You should receive an email shortly.`;
+        // TODO: Implement actual submission logic (e.g., send email, log to DB)
+      } catch (saveError: any) {
+        console.error("Error saving booking to Firestore:", saveError);
+        // Update validityResponse to reflect the save error, as the overall operation failed.
+        validityResponse.isValid = false;
+        validityResponse.errors = validityResponse.errors || [];
+        validityResponse.errors.push("Failed to save your booking details. Please try again.");
+        aiMessage = `There was an issue saving your booking: ${saveError.message || 'Please try again.'}`;
+        return { validityResponse, aiMessage, error: saveError.message || "Failed to save booking." };
+      }
     } else {
       aiMessage = `There are some issues with your request: ${validityResponse.errors.join('. ')}. Please correct them and try again.`;
     }
 
-    return { validityResponse, aiMessage };
+    return { validityResponse, aiMessage, bookingId };
   } catch (e: any) {
     console.error("Error submitting booking request:", e);
     const errorMessage = e.message || "Sorry, an error occurred while submitting your request. Please try again later.";
@@ -139,3 +153,4 @@ export async function submitBookingRequest(
     };
   }
 }
+
