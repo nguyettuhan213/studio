@@ -13,8 +13,8 @@ import type { ExtractBookingDetailsOutput } from '@/ai/flows/extract-booking-det
  */
 export async function saveBookingDetailsToFirestore(bookingDetails: ExtractBookingDetailsOutput): Promise<string> {
   try {
-    const bookingsCollectionRef = collection(db, "bookings");
-    const docRef = await addDoc(bookingsCollectionRef, {
+    const requestsCollectionRef = collection(db, "requests");
+    const docRef = await addDoc(requestsCollectionRef, {
       ...bookingDetails,
       createdAt: serverTimestamp(), // Automatically adds the server's timestamp
       status: 'pending', // Default status for new bookings
