@@ -54,10 +54,10 @@ export default function BookingRoomPage() {
     const unsubscribe = observeAuthState((user) => {
       setCurrentUser(user);
       if (user) {
-        setIsAuthModalOpen(false); // Close auth modal if user is found
+        setIsAuthModalOpen(false); 
       }
     });
-    return () => unsubscribe(); // Cleanup subscription on unmount
+    return () => unsubscribe(); 
   }, []);
 
   const scrollToBottom = useCallback(() => {
@@ -83,9 +83,9 @@ export default function BookingRoomPage() {
       const initialMessage = await getInitialBotMessage();
       addMessage('ai', initialMessage);
     } catch (error) {
-      addMessage('ai', "Sorry, I couldn't start our conversation. Please refresh.");
+      addMessage('ai', "Xin lỗi, tôi không thể bắt đầu cuộc trò chuyện. Vui lòng làm mới trang.");
       console.error("Failed to get initial bot message", error);
-      toast({ title: "Connection Error", description: "Could not fetch initial message.", variant: "destructive" });
+      toast({ title: "Lỗi Kết Nối", description: "Không thể tải tin nhắn ban đầu.", variant: "destructive" });
     } finally {
       setIsLoading(false);
       inputRef.current?.focus();
@@ -94,7 +94,7 @@ export default function BookingRoomPage() {
 
 
   useEffect(() => {
-    if (messages.length === 0) { // Only fetch initial if no messages exist
+    if (messages.length === 0) { 
         fetchInitialMessageAndFocus();
     }
   }, [fetchInitialMessageAndFocus, messages.length]);
@@ -112,15 +112,15 @@ export default function BookingRoomPage() {
       const result = await processUserMessage(text, currentBookingDetails);
       if (result.error) {
         addMessage('ai', result.error);
-        toast({ title: "Error", description: result.error, variant: "destructive" });
+        toast({ title: "Lỗi", description: result.error, variant: "destructive" });
       } else {
         addMessage('ai', result.aiMessage);
         setCurrentBookingDetails(result.updatedDetails);
       }
     } catch (error) {
-      const errorMsg = "An unexpected error occurred. Please try again.";
+      const errorMsg = "Đã xảy ra lỗi không mong muốn. Vui lòng thử lại.";
       addMessage('ai', errorMsg);
-      toast({ title: "Processing Error", description: errorMsg, variant: "destructive" });
+      toast({ title: "Lỗi Xử Lý", description: errorMsg, variant: "destructive" });
       console.error("Failed to process message", error);
     } finally {
       setIsLoading(false);
@@ -131,22 +131,22 @@ export default function BookingRoomPage() {
   const handleConfirmBooking = async (detailsToConfirm: ParsedBookingDetails) => {
     setIsLoading(true);
     setShowBookingForm(false); 
-    addMessage('ai', "Submitting your request with the provided details...");
+    addMessage('ai', "Đang gửi yêu cầu của bạn với các chi tiết đã cung cấp...");
     try {
       const result = await submitBookingRequest(detailsToConfirm);
       addMessage('ai', result.aiMessage);
       if (result.validityResponse.isValid) {
-        toast({ title: "Success!", description: "Booking request submitted successfully." });
+        toast({ title: "Thành Công!", description: "Yêu cầu đặt phòng đã được gửi thành công." });
         setCurrentBookingDetails({}); 
       } else {
-        toast({ title: "Validation Failed", description: result.aiMessage, variant: "destructive" });
+        toast({ title: "Xác Thực Thất Bại", description: result.aiMessage, variant: "destructive" });
         setShowBookingForm(true); 
         setCurrentBookingDetails(detailsToConfirm); 
       }
     } catch (error) {
-      const errorMsg = "An error occurred during submission. Please try again.";
+      const errorMsg = "Đã xảy ra lỗi trong quá trình gửi. Vui lòng thử lại.";
       addMessage('ai', errorMsg);
-      toast({ title: "Submission Error", description: errorMsg, variant: "destructive" });
+      toast({ title: "Lỗi Gửi Yêu Cầu", description: errorMsg, variant: "destructive" });
       setShowBookingForm(true);
       setCurrentBookingDetails(detailsToConfirm);
       console.error("Failed to confirm booking", error);
@@ -164,24 +164,23 @@ export default function BookingRoomPage() {
     setMessages([]);
     setCurrentBookingDetails({});
     setShowBookingForm(false);
-    fetchInitialMessageAndFocus(); // This will add the initial AI message
-    toast({ title: "Chat Reset", description: "Starting a new booking conversation." });
+    fetchInitialMessageAndFocus(); 
+    toast({ title: "Đặt Lại Cuộc Trò Chuyện", description: "Bắt đầu cuộc trò chuyện đặt phòng mới." });
   };
 
   const handleLogout = async () => {
     setIsLoading(true);
     try {
       await signout();
-      setCurrentUser(null); // Explicitly set user to null
-      toast({ title: "Logged Out", description: "You have been successfully logged out." });
-      // Reset chat and booking details on logout
+      setCurrentUser(null); 
+      toast({ title: "Đã Đăng Xuất", description: "Bạn đã đăng xuất thành công." });
       setMessages([]);
       setCurrentBookingDetails({});
       setShowBookingForm(false);
-      fetchInitialMessageAndFocus(); // Fetch new initial message for logged-out state
+      fetchInitialMessageAndFocus(); 
     } catch (error) {
       console.error("Logout failed", error);
-      toast({ title: "Logout Error", description: "Failed to log out. Please try again.", variant: "destructive" });
+      toast({ title: "Lỗi Đăng Xuất", description: "Không thể đăng xuất. Vui lòng thử lại.", variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
@@ -205,9 +204,7 @@ export default function BookingRoomPage() {
     <div className="flex flex-col items-center min-h-screen p-4 md:p-8 bg-background text-foreground relative">
       <Card className="w-full max-w-2xl shadow-2xl rounded-lg overflow-hidden border-primary/20">
         <div className="flex justify-between items-center p-2 border-b border-border">
-            <div className="flex items-center gap-2"> {/* Placeholder for potential brand/logo */}
-                {/* <img src="/logo.png" alt="Logo" className="h-8 w-8" /> */}
-                {/* <span className="font-semibold text-lg">My App</span> */}
+            <div className="flex items-center gap-2"> 
             </div>
             {currentUser ? (
               <DropdownMenu>
@@ -225,7 +222,7 @@ export default function BookingRoomPage() {
                   <DropdownMenuLabel className="font-normal">
                     <div className="flex flex-col space-y-1">
                       <p className="text-sm font-medium leading-none">
-                        {currentUser.displayName || "User"}
+                        {currentUser.displayName || "Người dùng"}
                       </p>
                       <p className="text-xs leading-none text-muted-foreground">
                         {currentUser.email}
@@ -235,13 +232,13 @@ export default function BookingRoomPage() {
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
                     <LogOut className="mr-2 h-4 w-4" />
-                    <span>Log out</span>
+                    <span>Đăng xuất</span>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
               <Button variant="outline" onClick={() => setIsAuthModalOpen(true)} disabled={isLoading}>
-                Login / Signup
+                Đăng nhập / Đăng ký
               </Button>
             )}
         </div>
@@ -249,24 +246,24 @@ export default function BookingRoomPage() {
         <CardHeader className="bg-card-foreground/5">
           <div className="flex justify-between items-center">
             <CardTitle className="text-2xl font-semibold flex items-center gap-2 text-primary">
-              <MessageSquare size={28} /> BookingRoom Assistant
+              <MessageSquare size={28} /> Trợ lý Đặt Phòng
             </CardTitle>
-            <Button variant="ghost" size="icon" onClick={handleStartOver} title="Start Over" disabled={isLoading}>
+            <Button variant="ghost" size="icon" onClick={handleStartOver} title="Bắt đầu lại" disabled={isLoading}>
               <RotateCcw size={20} />
             </Button>
           </div>
           <CardDescription className="text-foreground/70">
-            Chat with our AI to book your room. Type your request below.
+            Trò chuyện với AI của chúng tôi để đặt phòng. Nhập yêu cầu của bạn dưới đây.
           </CardDescription>
         </CardHeader>
 
         <CardContent className="p-0">
-          <ScrollArea className="h-[calc(50vh-40px)] md:h-[calc(60vh-40px)] p-6" ref={scrollAreaRef}> {/* Adjusted height */}
+          <ScrollArea className="h-[calc(50vh-40px)] md:h-[calc(60vh-40px)] p-6" ref={scrollAreaRef}>
             {messages.map((msg) => (
               <ChatMessageItem key={msg.id} sender={msg.sender} text={msg.text} timestamp={msg.timestamp} />
             ))}
             {isLoading && messages.length > 0 && messages[messages.length-1].sender === 'user' && (
-              <ChatMessageItem sender="ai" text="..." timestamp={new Date()} />
+              <ChatMessageItem sender="ai" text="Đang xử lý..." timestamp={new Date()} />
             )}
           </ScrollArea>
         </CardContent>
@@ -275,7 +272,7 @@ export default function BookingRoomPage() {
           {Object.keys(currentBookingDetails).length > 0 && !showBookingForm && (
             <div className="mb-3 flex justify-center">
               <Button onClick={handleEditDetails} variant="outline" className="border-primary text-primary hover:bg-primary/10" disabled={isLoading}>
-                <Edit3 size={16} className="mr-2" /> Review & Confirm Details
+                <Edit3 size={16} className="mr-2" /> Xem lại & Xác nhận Chi tiết
               </Button>
             </div>
           )}
@@ -283,7 +280,7 @@ export default function BookingRoomPage() {
             <UiInput
               ref={inputRef}
               type="text"
-              placeholder="Type your booking request..."
+              placeholder="Nhập yêu cầu đặt phòng của bạn..."
               value={userInput}
               onChange={(e) => setUserInput(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && !isLoading && handleSendMessage()}
@@ -294,7 +291,7 @@ export default function BookingRoomPage() {
               onClick={handleSendMessage}
               disabled={isLoading || !userInput.trim()}
               className="px-6 py-3 text-base bg-primary hover:bg-primary/90 text-primary-foreground"
-              aria-label="Send message"
+              aria-label="Gửi tin nhắn"
             >
               {isLoading && messages.length > 0 && messages[messages.length-1].sender === 'user' ? <Loader2 className="animate-spin" size={20} /> : <Send size={20} />}
             </Button>
@@ -320,3 +317,4 @@ export default function BookingRoomPage() {
     </div>
   );
 }
+

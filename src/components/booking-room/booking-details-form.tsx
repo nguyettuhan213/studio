@@ -14,7 +14,7 @@ import { CheckCircle, Save } from 'lucide-react';
 interface BookingDetailsFormProps {
   initialDetails: ParsedBookingDetails;
   onSubmit: (details: ParsedBookingDetails) => void;
-  onCancel?: () => void; // Optional: if there's a cancel action
+  onCancel?: () => void; 
   isLoading?: boolean;
 }
 
@@ -39,30 +39,30 @@ const BookingDetailsForm: FC<BookingDetailsFormProps> = ({ initialDetails, onSub
   };
 
   const detailFields: Array<{ key: keyof ParsedBookingDetails; label: string; type?: string; component?: 'textarea' }> = [
-    { key: 'room', label: 'Room' },
-    { key: 'date', label: 'Date', type: 'text' }, // Could be Calendar input
-    { key: 'time', label: 'Time' },
-    { key: 'purpose', label: 'Purpose of Booking', component: 'textarea' },
-    { key: 'estimated_number_of_attendees', label: 'Est. Attendees', type: 'number' },
-    { key: 'special_requirements', label: 'Special Requirements', component: 'textarea' },
-    { key: 'target_email', label: 'Target Email', type: 'email' },
-    { key: 'cc_email', label: 'CC Email (Optional)', type: 'email' },
-    { key: 'requestorName', label: 'Requestor Name' },
-    { key: 'requestorMail', label: 'Requestor Email', type: 'email' },
-    { key: 'requestorMSSV', label: 'Requestor MSSV/ID' },
-    { key: 'requestorRole', label: 'Requestor Role' },
-    { key: 'requestorDept', label: 'Requestor Department' },
-    { key: 'CLB', label: 'Club/Organization' },
+    { key: 'room', label: 'Phòng' },
+    { key: 'date', label: 'Ngày', type: 'text' }, 
+    { key: 'time', label: 'Thời gian' },
+    { key: 'purpose', label: 'Mục đích Đặt phòng', component: 'textarea' },
+    { key: 'estimated_number_of_attendees', label: 'Số người dự kiến', type: 'number' },
+    { key: 'special_requirements', label: 'Yêu cầu Đặc biệt', component: 'textarea' },
+    { key: 'target_email', label: 'Email Nhận thông báo', type: 'email' },
+    { key: 'cc_email', label: 'Email CC (Tùy chọn)', type: 'email' },
+    { key: 'requestorName', label: 'Tên Người yêu cầu' },
+    { key: 'requestorMail', label: 'Email Người yêu cầu', type: 'email' },
+    { key: 'requestorMSSV', label: 'MSSV/ID Người yêu cầu' },
+    { key: 'requestorRole', label: 'Vai trò Người yêu cầu' },
+    { key: 'requestorDept', label: 'Khoa/Phòng ban Người yêu cầu' },
+    { key: 'CLB', label: 'Câu lạc bộ/Tổ chức' },
   ];
 
   return (
     <Card className="w-full shadow-xl border-primary/20">
       <CardHeader>
         <CardTitle className="text-xl flex items-center gap-2">
-          <CheckCircle className="text-primary" /> Review Booking Details
+          <CheckCircle className="text-primary" /> Xem lại Chi tiết Đặt phòng
         </CardTitle>
         <CardDescription>
-          Please verify the information below. You can make changes if needed before submitting.
+          Vui lòng xác minh thông tin dưới đây. Bạn có thể thay đổi nếu cần trước khi gửi.
         </CardDescription>
       </CardHeader>
       <form onSubmit={handleSubmit}>
@@ -102,11 +102,11 @@ const BookingDetailsForm: FC<BookingDetailsFormProps> = ({ initialDetails, onSub
         <CardFooter className="flex justify-end gap-3 pt-6 border-t border-border">
           {onCancel && (
             <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
-              Cancel
+              Hủy
             </Button>
           )}
           <Button type="submit" disabled={isLoading} className="bg-primary hover:bg-primary/90 text-primary-foreground">
-            {isLoading ? 'Submitting...' : 'Confirm & Submit Request'}
+            {isLoading ? 'Đang gửi...' : 'Xác nhận & Gửi Yêu cầu'}
             {!isLoading && <Save size={18} className="ml-2" />}
           </Button>
         </CardFooter>

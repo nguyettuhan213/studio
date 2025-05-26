@@ -1,50 +1,50 @@
 // use server'
-
+'use server';
 /**
- * @fileOverview This file defines a Genkit flow for handling missing details in room booking requests.
+ * @fileOverview Tệp này xác định một luồng Genkit để xử lý các chi tiết còn thiếu trong yêu cầu đặt phòng.
  *
- * - handleMissingDetails - A function that orchestrates the process of identifying and requesting missing information.
- * - HandleMissingDetailsInput - The input type for the handleMissingDetails function.
- * - HandleMissingDetailsOutput - The return type for the handleMissingDetails function.
+ * - handleMissingDetails - Một hàm điều phối quá trình xác định và yêu cầu thông tin còn thiếu.
+ * - HandleMissingDetailsInput - Kiểu đầu vào cho hàm handleMissingDetails.
+ * - HandleMissingDetailsOutput - Kiểu trả về cho hàm handleMissingDetails.
  */
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const HandleMissingDetailsInputSchema = z.object({
-  room: z.string().optional().describe('The room requested for booking.'),
-  date: z.string().optional().describe('The date for the booking (e.g., April 1, 2025).'),
-  time: z.string().optional().describe('The time slot for the booking (e.g., 10:30 AM - 12:30 PM (GMT+7)).'),
-  purpose: z.string().optional().describe('The purpose of the booking (e.g., Weekly AI workshop).'),
+  room: z.string().optional().describe('Phòng được yêu cầu đặt.'),
+  date: z.string().optional().describe('Ngày đặt phòng (ví dụ: 01 tháng 4, 2025).'),
+  time: z.string().optional().describe('Khung giờ đặt phòng (ví dụ: 10:30 SA - 12:30 CH (GMT+7)).'),
+  purpose: z.string().optional().describe('Mục đích của việc đặt phòng (ví dụ: Hội thảo AI hàng tuần).'),
   estimated_number_of_attendees: z
     .number()
     .optional()
-    .describe('The estimated number of attendees (e.g., 20).'),
+    .describe('Số lượng người tham dự dự kiến (ví dụ: 20).'),
   special_requirements: z
     .string()
     .optional()
-    .describe('Any special requirements for the booking (e.g., Projector, whiteboard).'),
+    .describe('Bất kỳ yêu cầu đặc biệt nào cho việc đặt phòng (ví dụ: Máy chiếu, bảng trắng).'),
   target_email: z
     .string()
     .optional()
-    .describe('The target email address for booking confirmations.'),
-  cc_email: z.string().optional().describe('The CC email address for booking confirmations.'),
-  requestorMail: z.string().describe('The email address of the requestor.'),
-  requestorMSSV: z.string().describe('The student ID of the requestor.'),
-  requestorRole: z.string().describe('The role of the requestor (e.g., Chưởng ban).'),
-  requestorDept: z.string().describe('The department of the requestor (e.g., Khoa Khoa học).'),
-  CLB: z.string().describe('The club or organization making the request (e.g., Edtech).'),
-  requestorName: z.string().describe('The name of the requestor.'),
+    .describe('Địa chỉ email người nhận để xác nhận đặt phòng.'),
+  cc_email: z.string().optional().describe('Địa chỉ email CC để xác nhận đặt phòng.'),
+  requestorMail: z.string().describe('Địa chỉ email của người yêu cầu.'),
+  requestorMSSV: z.string().describe('Mã số sinh viên của người yêu cầu.'),
+  requestorRole: z.string().describe('Vai trò của người yêu cầu (ví dụ: Trưởng ban).'),
+  requestorDept: z.string().describe('Khoa của người yêu cầu (ví dụ: Khoa Khoa học).'),
+  CLB: z.string().describe('Câu lạc bộ hoặc tổ chức thực hiện yêu cầu (ví dụ: Edtech).'),
+  requestorName: z.string().describe('Tên của người yêu cầu.'),
 });
 
 export type HandleMissingDetailsInput = z.infer<typeof HandleMissingDetailsInputSchema>;
 
 const HandleMissingDetailsOutputSchema = z.object({
-  missingDetails: z.array(z.string()).describe('An array of missing details in the booking request.'),
+  missingDetails: z.array(z.string()).describe('Một mảng các chi tiết còn thiếu trong yêu cầu đặt phòng.'),
   followUpQuestions: z
     .array(z.string())
-    .describe('An array of follow-up questions to ask the user to gather missing details.'),
-  isComplete: z.boolean().describe('Whether all required details are present.'),
+    .describe('Một mảng các câu hỏi nối tiếp để hỏi người dùng nhằm thu thập các chi tiết còn thiếu (bằng tiếng Việt).'),
+  isComplete: z.boolean().describe('Liệu tất cả các chi tiết cần thiết đã có mặt hay chưa.'),
 });
 
 export type HandleMissingDetailsOutput = z.infer<typeof HandleMissingDetailsOutputSchema>;
@@ -57,29 +57,29 @@ const prompt = ai.definePrompt({
   name: 'handleMissingDetailsPrompt',
   input: {schema: HandleMissingDetailsInputSchema},
   output: {schema: HandleMissingDetailsOutputSchema},
-  prompt: `You are a helpful assistant that identifies missing information from a room booking request and formulates follow-up questions to collect the missing details.
+  prompt: `Bạn là một trợ lý hữu ích giúp xác định thông tin còn thiếu từ yêu cầu đặt phòng và xây dựng các câu hỏi nối tiếp để thu thập các chi tiết còn thiếu bằng tiếng Việt.
 
-  Here's the booking request information you have so far:
-  Room: {{{room}}}
-  Date: {{{date}}}
-  Time: {{{time}}}
-  Purpose: {{{purpose}}}
-  Number of Attendees: {{{estimated_number_of_attendees}}}
-  Special Requirements: {{{special_requirements}}}
-  Target Email: {{{target_email}}}
-  CC Email: {{{cc_email}}}
-  Requestor Email: {{{requestorMail}}}
-  Requestor MSSV: {{{requestorMSSV}}}
-  Requestor Role: {{{requestorRole}}}
-  Requestor Department: {{{requestorDept}}}
-  Club: {{{CLB}}}
-  Requestor Name: {{{requestorName}}}
+  Đây là thông tin yêu cầu đặt phòng bạn có cho đến nay:
+  Phòng: {{{room}}}
+  Ngày: {{{date}}}
+  Thời gian: {{{time}}}
+  Mục đích: {{{purpose}}}
+  Số người tham dự: {{{estimated_number_of_attendees}}}
+  Yêu cầu đặc biệt: {{{special_requirements}}}
+  Email đích: {{{target_email}}}
+  Email CC: {{{cc_email}}}
+  Email người yêu cầu: {{{requestorMail}}}
+  MSSV người yêu cầu: {{{requestorMSSV}}}
+  Vai trò người yêu cầu: {{{requestorRole}}}
+  Khoa người yêu cầu: {{{requestorDept}}}
+  Câu lạc bộ: {{{CLB}}}
+  Tên người yêu cầu: {{{requestorName}}}
 
-  1.  Identify which of the following details are missing: room, date, time, purpose, estimated_number_of_attendees, special_requirements, target_email.
-  2.  Formulate a list of follow-up questions to ask the user to gather the missing details. Each question should be clear and specific.
-  3.  If no details are missing, then isComplete should be true. Otherwise, isComplete should be false.
+  1.  Xác định những chi tiết nào sau đây còn thiếu: phòng, ngày, thời gian, mục đích, số người tham dự dự kiến, yêu cầu đặc biệt, email đích.
+  2.  Xây dựng một danh sách các câu hỏi nối tiếp bằng tiếng Việt để hỏi người dùng nhằm thu thập các chi tiết còn thiếu. Mỗi câu hỏi phải rõ ràng và cụ thể.
+  3.  Nếu không có chi tiết nào còn thiếu, thì isComplete phải là true. Ngược lại, isComplete phải là false.
 
-  Return the missing details and follow-up questions in the format specified by the output schema.`,
+  Trả về các chi tiết còn thiếu và các câu hỏi nối tiếp theo định dạng được chỉ định bởi schema đầu ra.`,
 });
 
 const handleMissingDetailsFlow = ai.defineFlow(
