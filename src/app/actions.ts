@@ -28,8 +28,7 @@ type MissingDetailsResponse = HandleMissingDetailsOutput;
 type ValidityResponse = AssessRequestValidityOutput;
 
 export async function getInitialBotMessage(): Promise<string> {
-    // You can customize this initial message
-    return "Hello! I'm your room booking assistant. How can I help you find and book a room today? Please describe what you're looking for.";
+    return "Xin chào! Tôi là trợ lý đặt phòng AI của bạn. Tôi có thể giúp bạn tìm và đặt phòng như thế nào hôm nay? Vui lòng mô tả những gì bạn đang tìm kiếm.";
 }
 
 export async function processUserMessage(
@@ -60,21 +59,21 @@ export async function processUserMessage(
     // Ensure all fields defined in ParsedBookingDetails (ExtractBookingDetailsOutput) are present,
     // even if they are empty strings or default values from the AI.
     const defaultsFromSchema = z.object({
-      room: z.string().describe('The room requested for booking.'),
-      date: z.string().describe('The date for the booking, preferably in ISO 8601 format (e.g., 2025-04-01).'),
-      time: z.string().describe('The time range for the booking as a human-readable string (e.g., 10:30 AM - 12:30 PM GMT+7).'),
-      purpose: z.string().describe('The purpose of the booking (e.g., Weekly AI workshop).'),
-      estimated_number_of_attendees: z.number().describe('The estimated number of attendees.'),
-      special_requirements: z.string().describe('Any special requirements for the booking (e.g., Projector, whiteboard, and access to power outlets).'),
-      target_email: z.string().describe('Recipient email for request confirmation or processing.'),
-      cc_email: z.string().optional().describe('Optional CC email address for the booking confirmation.'),
-      requestorMail: z.string().describe('The email of the person requesting.'),
-      requestorMSSV: z.string().describe('The student ID (MSSV) of the person requesting.'),
-      requestorRole: z.string().describe('The role of the person requesting in their club or organization (e.g., Chưởng ban).'),
-      requestorDept: z.string().describe('The department or faculty of the person requesting (e.g., Khoa Khoa học).'),
-      CLB: z.string().describe('The club or organization name (CLB) making the request (e.g., Edtech).'),
-      requestorName: z.string().describe('The full name of the person requesting.'),
- }).parse(newlyExtracted); // Get defaults if schema defines them
+        room: z.string().describe('Phòng được yêu cầu đặt.'),
+        date: z.string().describe('Ngày đặt phòng, ưu tiên định dạng ISO 8601 (ví dụ: 2025-04-01).'),
+        time: z.string().describe('Khoảng thời gian đặt phòng dưới dạng chuỗi dễ đọc (ví dụ: 10:30 SA - 12:30 CH GMT+7).'),
+        purpose: z.string().describe('Mục đích của việc đặt phòng (ví dụ: Hội thảo AI hàng tuần).'),
+        estimated_number_of_attendees: z.number().describe('Số lượng người tham dự dự kiến.'),
+        special_requirements: z.string().describe('Bất kỳ yêu cầu đặc biệt nào cho việc đặt phòng (ví dụ: Máy chiếu, bảng trắng, và quyền truy cập vào ổ cắm điện).'),
+        target_email: z.string().describe('Email người nhận để xác nhận hoặc xử lý yêu cầu.'),
+        cc_email: z.string().optional().describe('Địa chỉ email CC tùy chọn cho xác nhận đặt phòng.'),
+        requestorMail: z.string().describe('Email của người yêu cầu.'),
+        requestorMSSV: z.string().describe('Mã số sinh viên (MSSV) của người yêu cầu.'),
+        requestorRole: z.string().describe('Vai trò của người yêu cầu trong câu lạc bộ hoặc tổ chức của họ (ví dụ: Trưởng ban).'),
+        requestorDept: z.string().describe('Khoa hoặc phòng ban của người yêu cầu (ví dụ: Khoa Khoa học).'),
+        CLB: z.string().describe('Tên câu lạc bộ hoặc tổ chức (CLB) thực hiện yêu cầu (ví dụ: Edtech).'),
+        requestorName: z.string().describe('Họ tên đầy đủ của người yêu cầu.'),
+    }).parse(newlyExtracted); // Get defaults if schema defines them
     Object.keys(defaultsFromSchema).forEach(key => {
       const typedKey = key as keyof ParsedBookingDetails;
       if (updatedDetails[typedKey] === undefined) {
@@ -86,20 +85,20 @@ export async function processUserMessage(
     const missingDetailsInput = updatedDetails as HandleMissingDetailsInput; // Assuming structure matches
     const missingDetailsResponse = await handleMissingDetails(missingDetailsInput);
 
-    let aiMessage = "Thanks for the information. ";
+    let aiMessage = "Cảm ơn bạn đã cung cấp thông tin. ";
     if (!missingDetailsResponse.isComplete && missingDetailsResponse.followUpQuestions.length > 0) {
-      aiMessage += `I still need a bit more information: ${missingDetailsResponse.followUpQuestions.join(' ')}`;
+      aiMessage += `Tôi vẫn cần thêm một chút thông tin: ${missingDetailsResponse.followUpQuestions.join(' ')}`;
     } else if (missingDetailsResponse.isComplete) {
-      aiMessage += "I think I have all the details. Please review them below and confirm if everything looks correct.";
+      aiMessage += "Tôi nghĩ rằng tôi đã có đầy đủ các chi tiết. Vui lòng xem lại chúng dưới đây và xác nhận nếu mọi thứ đều chính xác.";
     } else {
-        aiMessage += "Is there anything else I can help you with regarding this booking?";
+        aiMessage += "Tôi có thể giúp gì khác cho bạn liên quan đến việc đặt phòng này không?";
     }
 
     return { updatedDetails, missingDetailsResponse, aiMessage };
 
   } catch (e: any) {
     console.error("Error processing user message:", e);
-    const errorMessage = e.message || "Sorry, I encountered an error. Could you try rephrasing or providing the details again?";
+    const errorMessage = e.message || "Xin lỗi, tôi đã gặp lỗi. Bạn có thể thử diễn đạt lại hoặc cung cấp lại thông tin chi tiết không?";
     return {
       updatedDetails: currentAccumulatedDetails as ParsedBookingDetails,
       missingDetailsResponse: { missingDetails: [], followUpQuestions: [errorMessage], isComplete: false },
@@ -127,25 +126,23 @@ export async function submitBookingRequest(
     if (validityResponse.isValid) {
       try {
         bookingId = await saveBookingDetailsToFirestore(finalDetails);
-        aiMessage = `Great! Your booking request (ID: ${bookingId}) has been saved successfully and is pending confirmation. You should receive an email shortly.`;
-        // TODO: Implement actual submission logic (e.g., send email, log to DB)
+        aiMessage = `Tuyệt vời! Yêu cầu đặt phòng của bạn (ID: ${bookingId}) đã được lưu thành công và đang chờ xác nhận. Bạn sẽ sớm nhận được email.`;
       } catch (saveError: any) {
         console.error("Error saving booking to Firestore:", saveError);
-        // Update validityResponse to reflect the save error, as the overall operation failed.
         validityResponse.isValid = false;
         validityResponse.errors = validityResponse.errors || [];
-        validityResponse.errors.push("Failed to save your booking details. Please try again.");
-        aiMessage = `There was an issue saving your booking: ${saveError.message || 'Please try again.'}`;
-        return { validityResponse, aiMessage, error: saveError.message || "Failed to save booking." };
+        validityResponse.errors.push("Không thể lưu chi tiết đặt phòng của bạn. Vui lòng thử lại.");
+        aiMessage = `Đã có sự cố khi lưu đặt phòng của bạn: ${saveError.message || 'Vui lòng thử lại.'}`;
+        return { validityResponse, aiMessage, error: saveError.message || "Không thể lưu đặt phòng." };
       }
     } else {
-      aiMessage = `There are some issues with your request: ${validityResponse.errors.join('. ')}. Please correct them and try again.`;
+      aiMessage = `Có một số vấn đề với yêu cầu của bạn: ${validityResponse.errors.join('. ')}. Vui lòng sửa chúng và thử lại.`;
     }
 
     return { validityResponse, aiMessage, bookingId };
   } catch (e: any) {
     console.error("Error submitting booking request:", e);
-    const errorMessage = e.message || "Sorry, an error occurred while submitting your request. Please try again later.";
+    const errorMessage = e.message || "Xin lỗi, đã xảy ra lỗi khi gửi yêu cầu của bạn. Vui lòng thử lại sau.";
     return {
       validityResponse: { isValid: false, errors: [errorMessage] },
       aiMessage: errorMessage,
