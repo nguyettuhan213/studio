@@ -1,5 +1,6 @@
 // src/lib/firebase.ts
 import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
+import { getAuth, type Auth } from "firebase/auth"; // Import Auth
 import { getFirestore, type Firestore } from "firebase/firestore";
 
 // Your web app's Firebase configuration
@@ -15,6 +16,7 @@ const firebaseConfig = {
 
 let app: FirebaseApp;
 let db: Firestore;
+let auth: Auth; // Declare auth
 
 if (getApps().length === 0) {
   app = initializeApp(firebaseConfig);
@@ -23,5 +25,6 @@ if (getApps().length === 0) {
 }
 
 db = getFirestore(app);
+auth = getAuth(app); // Initialize Auth
 
-export { app, db };
+export { app, db, auth }; // Export auth

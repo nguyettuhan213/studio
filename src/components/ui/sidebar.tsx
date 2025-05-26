@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useRouter } from 'next/navigation';
 import { Slot } from "@radix-ui/react-slot"
 import { VariantProps, cva } from "class-variance-authority"
 import { PanelLeft } from "lucide-react"
@@ -25,6 +26,7 @@ const SIDEBAR_WIDTH = "16rem"
 const SIDEBAR_WIDTH_MOBILE = "18rem"
 const SIDEBAR_WIDTH_ICON = "3rem"
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
+import { signout } from '@/services/auth-service';
 
 type SidebarContext = {
   state: "expanded" | "collapsed"
@@ -644,6 +646,24 @@ const SidebarMenuBadge = React.forwardRef<
 ))
 SidebarMenuBadge.displayName = "SidebarMenuBadge"
 
+const SidebarLogoutButton = React.forwardRef<
+  HTMLButtonElement,
+  React.ComponentProps<typeof SidebarMenuButton>
+>(({ className, ...props }, ref) => {
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    try {
+      await signout();
+      router.push('/'); // Redirect to homepage after logout
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
+  };
+
+  return <SidebarMenuButton ref={ref} onClick={handleLogout} className={className} {...props}>Logout</SidebarMenuButton>;
+});
+
 const SidebarMenuSkeleton = React.forwardRef<
   HTMLDivElement,
   React.ComponentProps<"div"> & {
@@ -738,6 +758,7 @@ SidebarMenuSubButton.displayName = "SidebarMenuSubButton"
 export {
   Sidebar,
   SidebarContent,
+  SidebarLogoutButton,
   SidebarFooter,
   SidebarGroup,
   SidebarGroupAction,
