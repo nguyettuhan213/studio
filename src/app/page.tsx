@@ -201,7 +201,7 @@ export default function BookingRoomPage() {
   }
 
   return (
-    <div className="flex flex-col items-center min-h-screen p-4 md:p-8 bg-background text-foreground relative">
+    <div className="flex flex-row items-center justify-center min-h-screen p-4 gap-3 md:p-8 bg-background text-foreground relative">
       <Card className="w-full max-w-2xl shadow-2xl rounded-lg overflow-hidden border-primary/20">
         <div className="flex justify-between items-center p-2 border-b border-border">
             <div className="flex items-center gap-2"> 
