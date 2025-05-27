@@ -197,7 +197,7 @@ export default function BookingRoomPage() {
     if (email) {
       return email.substring(0, 2).toUpperCase();
     }
-    return "U";
+    return <UserIcon size={20}/> as any; 
   }
 
   return (
@@ -205,42 +205,9 @@ export default function BookingRoomPage() {
       <Card className="w-full max-w-2xl shadow-2xl rounded-lg overflow-hidden border-primary/20">
         <div className="flex justify-between items-center p-2 border-b border-border">
             <div className="flex items-center gap-2"> 
+              {/* Keep this space for potential future left-aligned items */}
             </div>
-            {currentUser ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="relative h-10 w-10 rounded-full">
-                    <Avatar className="h-9 w-9">
-                      <AvatarImage src={currentUser.photoURL || undefined} alt={currentUser.displayName || currentUser.email || 'User'} />
-                      <AvatarFallback>
-                        {getAvatarFallbackName(currentUser.email, currentUser.displayName) || <UserIcon size={20}/>}
-                      </AvatarFallback>
-                    </Avatar>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-56" align="end" forceMount>
-                  <DropdownMenuLabel className="font-normal">
-                    <div className="flex flex-col space-y-1">
-                      <p className="text-sm font-medium leading-none">
-                        {currentUser.displayName || "Người dùng"}
-                      </p>
-                      <p className="text-xs leading-none text-muted-foreground">
-                        {currentUser.email}
-                      </p>
-                    </div>
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
-                    <LogOut className="mr-2 h-4 w-4" />
-                    <span>Đăng xuất</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : (
-              <Button variant="outline" onClick={() => setIsAuthModalOpen(true)} disabled={isLoading}>
-                Đăng nhập / Đăng ký
-              </Button>
-            )}
+            
         </div>
 
         <CardHeader className="bg-card-foreground/5">
@@ -248,14 +215,22 @@ export default function BookingRoomPage() {
             <CardTitle className="text-2xl font-semibold flex items-center gap-2 text-primary">
               <MessageSquare size={28} /> Trợ lý Đặt Phòng
             </CardTitle>
-            <Button variant="ghost" size="icon" onClick={handleStartOver} title="Bắt đầu lại" disabled={isLoading}>
-              <RotateCcw size={20} />
-            </Button>
+            <div className="flex items-center gap-2">
+              {Object.keys(currentBookingDetails).length > 0 && !showBookingForm && (
+                 <Button onClick={handleEditDetails} variant="ghost" size="icon" title="Xem lại & Xác nhận Chi tiết" disabled={isLoading}>
+                   <Edit3 size={20} />
+                 </Button>
+              )}
+              <Button variant="ghost" size="icon" onClick={handleStartOver} title="Bắt đầu lại" disabled={isLoading}>
+                <RotateCcw size={20} />
+              </Button>
+            </div>
           </div>
           <CardDescription className="text-foreground/70">
             Trò chuyện với AI của chúng tôi để đặt phòng. Nhập yêu cầu của bạn dưới đây.
           </CardDescription>
         </CardHeader>
+
 
         <CardContent className="p-0">
           <ScrollArea className="h-[calc(50vh-40px)] md:h-[calc(60vh-40px)] p-6" ref={scrollAreaRef}>
@@ -269,13 +244,6 @@ export default function BookingRoomPage() {
         </CardContent>
 
         <div className="border-t border-border p-4 bg-card-foreground/5">
-          {Object.keys(currentBookingDetails).length > 0 && !showBookingForm && (
-            <div className="mb-3 flex justify-center">
-              <Button onClick={handleEditDetails} variant="outline" className="border-primary text-primary hover:bg-primary/10" disabled={isLoading}>
-                <Edit3 size={16} className="mr-2" /> Xem lại & Xác nhận Chi tiết
-              </Button>
-            </div>
-          )}
           <div className="flex items-center gap-3">
             <UiInput
               ref={inputRef}
@@ -310,6 +278,44 @@ export default function BookingRoomPage() {
         </div>
       )}
 
+      {/* Moved user auth/avatar outside the card */}
+      <div className="absolute top-4 right-4 z-10">
+        {currentUser ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="relative h-10 w-10 rounded-full">
+                <Avatar className="h-9 w-9">
+                  <AvatarImage src={currentUser.photoURL || undefined} alt={currentUser.displayName || currentUser.email || 'User'} />
+                  <AvatarFallback>
+                    {getAvatarFallbackName(currentUser.email, currentUser.displayName)}
+                  </AvatarFallback>
+                </Avatar>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-56" align="end" forceMount>
+              <DropdownMenuLabel className="font-normal">
+                <div className="flex flex-col space-y-1">
+                  <p className="text-sm font-medium leading-none">
+                    {currentUser.displayName || "Người dùng"}
+                  </p>
+                  <p className="text-xs leading-none text-muted-foreground">
+                    {currentUser.email}
+                  </p>
+                </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
+                <LogOut className="mr-2 h-4 w-4" />
+                <span>Đăng xuất</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : (
+          <Button variant="outline" onClick={() => setIsAuthModalOpen(true)} disabled={isLoading}>
+            Đăng nhập / Đăng ký
+          </Button>
+        )}
+      </div>
       <AuthModal
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)} 
