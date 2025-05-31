@@ -50,7 +50,7 @@ export default function BookingRoomPage() {
   
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-
+ 
   useEffect(() => {
     const unsubscribe = observeAuthState((user) => {
       setCurrentUser(user);
