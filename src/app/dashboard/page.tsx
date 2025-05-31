@@ -25,9 +25,9 @@ const DashboardPage: React.FC = () => {
       setUser(user);
     });
     const fetchFlowData = async () => {
-      if (user?.email || true) {
+      if (user?.email) {
         try {
-          const q = query(collection(db, 'flowTracking'), where('owner', '==', "nguyenhonghanhword@gmail.com"));
+          const q = query(collection(db, 'flowTracking'), where('owner', '==', user?.email));
           const querySnapshot = await getDocs(q);
           const data = querySnapshot.docs.map(doc => doc.data() as FlowTrackingData);
           console.log(data);
@@ -47,7 +47,8 @@ const DashboardPage: React.FC = () => {
     <div style={{ display: 'flex' }}>
       <SidebarNavigation />
       <div style={{ flexGrow: 1, padding: '20px' }}>
-        <h1 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '20px' }}>Flow Tracking Dashboard</h1>
+      <h1 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '20px' }}>Xin chào {user?.email}!</h1>
+        <h1 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '20px' }}>Bảng điều khiển theo dõi luồng</h1>
 
         {loading ? (
           <p>Loading flow data...</p>
