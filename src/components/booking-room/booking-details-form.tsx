@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import type { ParsedBookingDetails } from '@/app/actions';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CheckCircle, Save } from 'lucide-react';
 
 interface BookingDetailsFormProps {
@@ -25,10 +26,18 @@ const BookingDetailsForm: FC<BookingDetailsFormProps> = ({ initialDetails, onSub
     setFormData(initialDetails);
   }, [initialDetails]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
+  const handleChange = (name: keyof ParsedBookingDetails, value: any) => {
     setFormData(prev => ({
       ...prev,
+ name: name === 'estimated_number_of_attendees' ? (value === '' ? undefined : parseInt(value, 10)) : value,
+    }));
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+ ...prev,
+      [name]: value,
       [name]: name === 'estimated_number_of_attendees' ? (value === '' ? undefined : parseInt(value, 10)) : value,
     }));
   };
@@ -38,7 +47,7 @@ const BookingDetailsForm: FC<BookingDetailsFormProps> = ({ initialDetails, onSub
     onSubmit(formData);
   };
 
-  const detailFields: Array<{ key: keyof ParsedBookingDetails; label: string; type?: string; component?: 'textarea' }> = [
+  const detailFields: Array<{ key: keyof ParsedBookingDetails; label: string; type?: string; component?: 'textarea' | 'select'; options?: string[] }> = [
     { key: 'room', label: 'Phòng' },
     { key: 'date', label: 'Ngày', type: 'text' }, 
     { key: 'time', label: 'Thời gian' },
@@ -51,7 +60,21 @@ const BookingDetailsForm: FC<BookingDetailsFormProps> = ({ initialDetails, onSub
     { key: 'requestorMail', label: 'Email Người yêu cầu', type: 'email' },
     { key: 'requestorMSSV', label: 'MSSV/ID Người yêu cầu' },
     { key: 'requestorRole', label: 'Vai trò Người yêu cầu' },
-    { key: 'requestorDept', label: 'Khoa/Phòng ban Người yêu cầu' },
+    {
+      key: 'requestorDept',
+      label: 'Khoa/Phòng ban Người yêu cầu',
+      component: 'select',
+ options: [
+ 'Khoa Giáo dục Quốc phòng & An ninh',
+ 'Khoa Giáo dục Thể chất',
+ 'Khoa Lý luận Chính trị',
+ 'Trường Cơ khí',
+ 'Trường Công nghệ Thông tin và Truyền thông',
+ 'Trường Điện - Điện tử',
+ 'Trường Hoá và Khoa học sự sống',
+ 'Trường Vật liệu', 'Trường Kinh tế', 'Khoa Toán - Tin', 'Khoa Vật lý Kỹ thuật', 'Khoa Ngoại ngữ', 'Khoa Khoa học và Công nghệ Giáo dục']
+    },
+
     { key: 'CLB', label: 'Câu lạc bộ/Tổ chức' },
   ];
 
@@ -78,26 +101,39 @@ const BookingDetailsForm: FC<BookingDetailsFormProps> = ({ initialDetails, onSub
                     id={field.key}
                     name={field.key}
                     value={formData[field.key]?.toString() || ''}
-                    onChange={handleChange}
+                    onChange={handleInputChange}
                     rows={3}
                     className="mt-1 bg-background/50 border-border focus:border-primary"
                     disabled={isLoading}
                   />
+                ) : field.component === 'select' ? (
+                  <Select
+                    value={formData[field.key]?.toString() || ''}
+                    onValueChange={(value) => handleChange(field.key, value)}
+                    disabled={isLoading}
+                  >
+                    <SelectTrigger className="mt-1 bg-background/50 border-border focus:border-primary">
+                      <SelectValue placeholder={`Chọn ${field.label}`} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {field.options?.map(option => <SelectItem key={option} value={option}>{option}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 ) : (
                   <UiInput
                     id={field.key}
                     name={field.key}
                     type={field.type || 'text'}
                     value={formData[field.key]?.toString() || ''}
-                    onChange={handleChange}
+                    onChange={handleInputChange}
                     className="mt-1 bg-background/50 border-border focus:border-primary"
                     disabled={isLoading}
                     min={field.type === 'number' ? 1 : undefined}
                   />
-                )}
+                )
+                }
               </div>
-            ))}
-          </div>
+            ))}</div>
         </CardContent>
         <CardFooter className="flex justify-end gap-3 pt-6 border-t border-border">
           {onCancel && (
