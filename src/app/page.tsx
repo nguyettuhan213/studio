@@ -216,7 +216,7 @@ export default function BookingRoomPage() {
               <MessageSquare size={28} /> Trợ lý Đặt Phòng
             </CardTitle>
             <div className="flex items-center gap-2">
-              {Object.keys(currentBookingDetails).length > 0 && !showBookingForm && (
+              {Object.keys(currentBookingDetails).length > 0 && (
                  <Button onClick={handleEditDetails} variant="ghost" size="icon" title="Xem lại & Xác nhận Chi tiết" disabled={isLoading}>
                    <Edit3 size={20} />
                  </Button>
@@ -267,7 +267,7 @@ export default function BookingRoomPage() {
         </div>
       </Card>
 
-      {showBookingForm && Object.keys(currentBookingDetails).length > 0 && (
+      { Object.keys(currentBookingDetails).length > 0 && (
         <div className="w-full max-w-2xl mt-8">
           <BookingDetailsForm
             initialDetails={currentBookingDetails as ParsedBookingDetails}
