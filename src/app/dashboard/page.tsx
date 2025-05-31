@@ -5,6 +5,7 @@ import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { observeAuthState } from '@/services/auth-service';
 import { User } from 'firebase/auth';
+import { SidebarNavigation } from '@/components/navigation/sidebar';
 interface FlowTrackingData {
   flowId?: string;
   status?: string;
@@ -43,66 +44,69 @@ const DashboardPage: React.FC = () => {
   }, [user]);
 
   return (
-<div>
-  <h1 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '20px' }}>Flow Tracking Dashboard</h1>
+    <div style={{ display: 'flex' }}>
+      <SidebarNavigation />
+      <div style={{ flexGrow: 1, padding: '20px' }}>
+        <h1 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '20px' }}>Flow Tracking Dashboard</h1>
 
-  {loading ? (
-    <p>Loading flow data...</p>
-  ) : flowData.length > 0 ? (
-    <ul style={{ padding: 0, listStyle: 'none' }}>
-      {flowData.map((flow, index) => (
-        <li
-          key={index}
-          style={{
-            background: '#ffffff',
-            border: '1px solid #e0e0e0',
-            borderRadius: '12px',
-            padding: '16px',
-            marginBottom: '16px',
-            boxShadow: '0 2px 6px rgba(0,0,0,0.05)',
-          }}
-        >
-          <div style={{ marginBottom: '8px' }}>
-            <strong>Flow ID:</strong> {flow.flowId ?? '(no id)'}<br />
-            <strong>Status:</strong> {flow.status}<br />
-            <strong>Start At:</strong>{' '}
-            {flow.startAt
-            ? new Date(flow.startAt).toLocaleString('vi-VN', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-                hour12: false
-              })
-            : 'N/A'}<br />
-          </div>
-
-          {/* Progress Indicator */}
-          <div style={{ display: 'flex', alignItems: 'center', marginTop: '12px' }}>
-            {[0, 1, 2, 3].map((stepNum) => (
-              <div
-                key={stepNum}
+        {loading ? (
+          <p>Loading flow data...</p>
+        ) : flowData.length > 0 ? (
+          <ul style={{ padding: 0, listStyle: 'none' }}>
+            {flowData.map((flow, index) => (
+              <li
+                key={index}
                 style={{
-                  width: '14px',
-                  height: '14px',
-                  borderRadius: '50%',
-                  backgroundColor:
-                    (flow?.step ?? 0) >= stepNum ? '#4F46E5' : '#E5E7EB',
-                  marginRight: '8px',
-                  transition: 'background-color 0.3s',
+                  background: '#ffffff',
+                  border: '1px solid #e0e0e0',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  marginBottom: '16px',
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.05)',
                 }}
-              ></div>
+              >
+                <div style={{ marginBottom: '8px' }}>
+                  <strong>Flow ID:</strong> {flow.flowId ?? '(no id)'}<br />
+                  <strong>Status:</strong> {flow.status}<br />
+                  <strong>Start At:</strong>{' '}
+                  {flow.startAt
+                    ? new Date(flow.startAt).toLocaleString('vi-VN', {
+                      day: '2-digit',
+                      month: '2-digit',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      second: '2-digit',
+                      hour12: false
+                    })
+                    : 'N/A'}<br />
+                </div>
+
+                {/* Progress Indicator */}
+                <div style={{ display: 'flex', alignItems: 'center', marginTop: '12px' }}>
+                  {[0, 1, 2, 3].map((stepNum) => (
+                    <div
+                      key={stepNum}
+                      style={{
+                        width: '14px',
+                        height: '14px',
+                        borderRadius: '50%',
+                        backgroundColor:
+                          (flow?.step ?? 0) >= stepNum ? '#4F46E5' : '#E5E7EB',
+                        marginRight: '8px',
+                        transition: 'background-color 0.3s',
+                      }}
+                    ></div>
+                  ))}
+                </div>
+              </li>
             ))}
-          </div>
-        </li>
-      ))}
-    </ul>
-  ) : (
-    <p>No flow tracking data found for this user.</p>
-  )}
-</div>
+          </ul>
+        ) : (
+          <p>No flow tracking data found for this user.</p>
+        )}
+      </div>
+    </div>
   );
 };
 
