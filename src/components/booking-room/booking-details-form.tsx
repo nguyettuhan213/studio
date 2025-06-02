@@ -56,6 +56,7 @@ const BookingDetailsForm: FC<BookingDetailsFormProps> = ({
           : value,
     }));
   };
+  
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
