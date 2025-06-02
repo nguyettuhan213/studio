@@ -48,7 +48,7 @@ const BookingDetailsForm: FC<BookingDetailsFormProps> = ({
   const handleChange = (name: keyof ParsedBookingDetails, value: any) => {
     setFormData((prev) => ({
       ...prev,
-      name:
+      [name]:
         name === "estimated_number_of_attendees"
           ? value === ""
             ? undefined
@@ -84,10 +84,11 @@ const BookingDetailsForm: FC<BookingDetailsFormProps> = ({
     type?: string;
     component?: "textarea" | "select";
     options?: string[];
+    required?: boolean;
   }> = [
-    { key: "room", label: "Phòng" },
-    { key: "date", label: "Ngày", type: "text" },
-    { key: "time", label: "Thời gian" },
+    { key: "room", label: "Phòng", required: true },
+    { key: "date", label: "Ngày", type: "text", required: true },
+    { key: "time", label: "Thời gian", required: true },
     { key: "purpose", label: "Mục đích Đặt phòng", component: "textarea" },
     {
       key: "estimated_number_of_attendees",
@@ -101,10 +102,15 @@ const BookingDetailsForm: FC<BookingDetailsFormProps> = ({
     },
     { key: "target_email", label: "Email Nhận thông báo", type: "email" },
     { key: "cc_email", label: "Email CC (Tùy chọn)", type: "email" },
-    { key: "requestorName", label: "Tên Người yêu cầu" },
-    { key: "requestorMail", label: "Email Người yêu cầu", type: "email" },
-    { key: "requestorMSSV", label: "MSSV/ID Người yêu cầu" },
-    { key: "requestorRole", label: "Vai trò Người yêu cầu" },
+    { key: "requestorName", label: "Tên Người yêu cầu", required: true },
+    {
+      key: "requestorMail",
+      label: "Email Người yêu cầu",
+      type: "email",
+      required: true,
+    },
+    { key: "requestorMSSV", label: "MSSV/ID Người yêu cầu", required: true },
+    { key: "requestorRole", label: "Vai trò Người yêu cầu", required: true },
     {
       key: "requestorDept",
       label: "Khoa/Phòng ban Người yêu cầu",
@@ -124,9 +130,10 @@ const BookingDetailsForm: FC<BookingDetailsFormProps> = ({
         "Khoa Ngoại ngữ",
         "Khoa Khoa học và Công nghệ Giáo dục",
       ],
+      required: true,
     },
 
-    { key: "CLB", label: "Câu lạc bộ/Tổ chức" },
+    { key: "CLB", label: "Câu lạc bộ/Tổ chức", required: true },
   ];
 
   return (
@@ -154,7 +161,10 @@ const BookingDetailsForm: FC<BookingDetailsFormProps> = ({
                   htmlFor={field.key}
                   className="text-sm font-medium text-foreground/80"
                 >
-                  {field.label}
+                  {field.label}{" "}
+                  {field.required && (
+                    <span className="text-red-500 ml-1">*</span>
+                  )}
                 </Label>
                 {field.component === "textarea" ? (
                   <Textarea
