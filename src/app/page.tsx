@@ -1,13 +1,27 @@
 // src/app/page.tsx
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Send, Loader2, MessageSquare, Edit3, RotateCcw, LogOut, User as UserIcon } from 'lucide-react';
-import type { User } from 'firebase/auth';
-import { Button } from '@/components/ui/button';
-import { Input as UiInput } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import {
+  Send,
+  Loader2,
+  MessageSquare,
+  Edit3,
+  RotateCcw,
+  LogOut,
+  User as UserIcon,
+} from "lucide-react";
+import type { User } from "firebase/auth";
+import { Button } from "@/components/ui/button";
+import { Input as UiInput } from "@/components/ui/input";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -19,51 +33,64 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { toast } from "@/hooks/use-toast";
 
-import ChatMessageItem from '@/components/booking-room/chat-message-item';
-import BookingDetailsForm from '@/components/booking-room/booking-details-form';
+import ChatMessageItem from "@/components/booking-room/chat-message-item";
+import BookingDetailsForm from "@/components/booking-room/booking-details-form";
 
-import AuthModal from '@/components/auth/auth-modal';
-import { SidebarNavigation } from '@/components/navigation/sidebar';
-import { observeAuthState, signout } from '@/services/auth-service';
+import AuthModal from "@/components/auth/auth-modal";
+import { SidebarNavigation } from "@/components/navigation/sidebar";
+import { observeAuthState, signout } from "@/services/auth-service";
 import {
   processUserMessage,
   submitBookingRequest,
   getInitialBotMessage,
   type ParsedBookingDetails,
-} from './actions';
+} from "./actions";
 
 interface ChatMessage {
   id: string;
-  sender: 'user' | 'ai';
+  sender: "user" | "ai";
   text: string;
   timestamp: Date;
 }
+type RequiredField =
+  | "room"
+  | "date"
+  | "time"
+  | "requestorMail"
+  | "requestorRole"
+  | "requestorDept"
+  | "CLB"
+  | "requestorName";
 
 export default function BookingRoomPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [userInput, setUserInput] = useState('');
+  const [userInput, setUserInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [currentBookingDetails, setCurrentBookingDetails] = useState<Partial<ParsedBookingDetails>>({});
+  const [currentBookingDetails, setCurrentBookingDetails] = useState<
+    Partial<ParsedBookingDetails>
+  >({});
   const [showBookingForm, setShowBookingForm] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  
+
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
- 
+
   useEffect(() => {
     const unsubscribe = observeAuthState((user) => {
       setCurrentUser(user);
       if (user) {
-        setIsAuthModalOpen(false); 
+        setIsAuthModalOpen(false);
       }
     });
-    return () => unsubscribe(); 
+    return () => unsubscribe();
   }, []);
 
   const scrollToBottom = useCallback(() => {
     if (scrollAreaRef.current) {
-      const viewport = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+      const viewport = scrollAreaRef.current.querySelector(
+        "[data-radix-scroll-area-viewport]"
+      );
       if (viewport) {
         viewport.scrollTop = viewport.scrollHeight;
       }
@@ -74,54 +101,75 @@ export default function BookingRoomPage() {
     scrollToBottom();
   }, [messages, scrollToBottom]);
 
-  const addMessage = useCallback((sender: 'user' | 'ai', text: string) => {
-    setMessages(prev => [...prev, { id: Date.now().toString() + Math.random(), sender, text, timestamp: new Date() }]);
+  const addMessage = useCallback((sender: "user" | "ai", text: string) => {
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: Date.now().toString() + Math.random(),
+        sender,
+        text,
+        timestamp: new Date(),
+      },
+    ]);
   }, []);
-  
+
   const fetchInitialMessageAndFocus = useCallback(async () => {
     setIsLoading(true);
     try {
       const initialMessage = await getInitialBotMessage();
-      addMessage('ai', initialMessage);
+      addMessage("ai", initialMessage);
     } catch (error) {
-      addMessage('ai', "Xin lỗi, tôi không thể bắt đầu cuộc trò chuyện. Vui lòng làm mới trang.");
+      addMessage(
+        "ai",
+        "Xin lỗi, tôi không thể bắt đầu cuộc trò chuyện. Vui lòng làm mới trang."
+      );
       console.error("Failed to get initial bot message", error);
-      toast({ title: "Lỗi Kết Nối", description: "Không thể tải tin nhắn ban đầu.", variant: "destructive" });
+      toast({
+        title: "Lỗi Kết Nối",
+        description: "Không thể tải tin nhắn ban đầu.",
+        variant: "destructive",
+      });
     } finally {
       setIsLoading(false);
       inputRef.current?.focus();
     }
   }, [addMessage]);
 
-
   useEffect(() => {
-    if (messages.length === 0) { 
-        fetchInitialMessageAndFocus();
+    if (messages.length === 0) {
+      fetchInitialMessageAndFocus();
     }
   }, [fetchInitialMessageAndFocus, messages.length]);
-
 
   const handleSendMessage = async () => {
     if (!userInput.trim() || isLoading) return;
     const text = userInput;
-    addMessage('user', text);
-    setUserInput('');
+    addMessage("user", text);
+    setUserInput("");
     setIsLoading(true);
     setShowBookingForm(false);
 
     try {
       const result = await processUserMessage(text, currentBookingDetails);
       if (result.error) {
-        addMessage('ai', result.error);
-        toast({ title: "Lỗi", description: result.error, variant: "destructive" });
+        addMessage("ai", result.error);
+        toast({
+          title: "Lỗi",
+          description: result.error,
+          variant: "destructive",
+        });
       } else {
-        addMessage('ai', result.aiMessage);
+        addMessage("ai", result.aiMessage);
         setCurrentBookingDetails(result.updatedDetails);
       }
     } catch (error) {
       const errorMsg = "Đã xảy ra lỗi không mong muốn. Vui lòng thử lại.";
-      addMessage('ai', errorMsg);
-      toast({ title: "Lỗi Xử Lý", description: errorMsg, variant: "destructive" });
+      addMessage("ai", errorMsg);
+      toast({
+        title: "Lỗi Xử Lý",
+        description: errorMsg,
+        variant: "destructive",
+      });
       console.error("Failed to process message", error);
     } finally {
       setIsLoading(false);
@@ -129,25 +177,110 @@ export default function BookingRoomPage() {
     }
   };
 
-  const handleConfirmBooking = async (detailsToConfirm: ParsedBookingDetails) => {
+  const handleValidationForm = (detailsToConfirm: ParsedBookingDetails) => {
+    const requiredFields: RequiredField[] = [
+      "room",
+      "date",
+      "time",
+      "requestorMail",
+      "requestorRole",
+      "requestorDept",
+      "CLB",
+      "requestorName",
+    ];
+
+    const validDepartments = [
+      "Khoa Giáo dục Quốc phòng & An ninh",
+      "Khoa Giáo dục Thể chất",
+      "Khoa Lý luận Chính trị",
+      "Trường Cơ khí",
+      "Trường Công nghệ Thông tin và Truyền thông",
+      "Trường Điện - Điện tử",
+      "Trường Hoá và Khoa học sự sống",
+      "Trường Vật liệu",
+      "Trường Kinh tế",
+      "Khoa Toán - Tin",
+      "Khoa Vật lý Kỹ thuật",
+      "Khoa Ngoại ngữ",
+      "Khoa Khoa học và Công nghệ Giáo dục",
+    ];
+
+    let validated = true;
+    let errMes = "";
+
+    for (const field of requiredFields) {
+      if (!detailsToConfirm[field]) {
+        validated = false;
+        errMes = `Trường "${field}" là bắt buộc.`;
+        break;
+      }
+    }
+
+    if (
+      validated &&
+      !detailsToConfirm.requestorMail.endsWith("@sis.hust.edu.vn")
+    ) {
+      validated = false;
+      errMes = "Vui lòng sử dụng tài khoản Hust trong Email Người yêu cầu.";
+    }
+
+    if (
+      validated &&
+      !validDepartments.includes(detailsToConfirm.requestorDept)
+    ) {
+      validated = false;
+      errMes = "Khoa/Phòng ban không hợp lệ.";
+    }
+
+    if (!validated) {
+      toast({
+        title: "Lỗi xác thực",
+        description: "Yêu cầu đặt phòng đã thất bại. " + errMes,
+        variant: "destructive",
+      });
+    }
+
+    return validated;
+  };
+
+  const handleConfirmBooking = async (
+    detailsToConfirm: ParsedBookingDetails
+  ) => {
+    const validated = handleValidationForm(detailsToConfirm);
+    if (validated == false) return;
+
     setIsLoading(true);
-    setShowBookingForm(false); 
-    addMessage('ai', "Đang gửi yêu cầu của bạn với các chi tiết đã cung cấp...");
+    setShowBookingForm(false);
+    addMessage(
+      "ai",
+      "Đang gửi yêu cầu của bạn với các chi tiết đã cung cấp..."
+    );
     try {
       const result = await submitBookingRequest(detailsToConfirm);
-      addMessage('ai', result.aiMessage);
+      addMessage("ai", result.aiMessage);
       if (result.validityResponse.isValid) {
-        toast({ title: "Thành Công!", description: "Yêu cầu đặt phòng đã được gửi thành công." });
-        setCurrentBookingDetails({}); 
+        toast({
+          title: "Thành Công!",
+          description: "Yêu cầu đặt phòng đã được gửi thành công.",
+        });
+        setCurrentBookingDetails({});
       } else {
-        toast({ title: "Xác Thực Thất Bại", description: result.aiMessage, variant: "destructive" });
-        setShowBookingForm(true); 
-        setCurrentBookingDetails(detailsToConfirm); 
+        toast({
+          title: "Xác Thực Thất Bại",
+          description: result.aiMessage,
+          variant: "destructive",
+        });
+        setShowBookingForm(true);
+        setCurrentBookingDetails(detailsToConfirm);
       }
     } catch (error) {
       const errorMsg = "Đã xảy ra lỗi trong quá trình gửi. Vui lòng thử lại.";
-      addMessage('ai', errorMsg);
-      toast({ title: "Lỗi Gửi Yêu Cầu", description: errorMsg, variant: "destructive" });
+      addMessage("ai", errorMsg);
+      toast({
+        title: "Lỗi Gửi Yêu Cầu",
+        description: errorMsg,
+        variant: "destructive",
+      });
       setShowBookingForm(true);
       setCurrentBookingDetails(detailsToConfirm);
       console.error("Failed to confirm booking", error);
@@ -165,31 +298,44 @@ export default function BookingRoomPage() {
     setMessages([]);
     setCurrentBookingDetails({});
     setShowBookingForm(false);
-    fetchInitialMessageAndFocus(); 
-    toast({ title: "Đặt Lại Cuộc Trò Chuyện", description: "Bắt đầu cuộc trò chuyện đặt phòng mới." });
+    fetchInitialMessageAndFocus();
+    toast({
+      title: "Đặt Lại Cuộc Trò Chuyện",
+      description: "Bắt đầu cuộc trò chuyện đặt phòng mới.",
+    });
   };
 
   const handleLogout = async () => {
     setIsLoading(true);
     try {
       await signout();
-      setCurrentUser(null); 
-      toast({ title: "Đã Đăng Xuất", description: "Bạn đã đăng xuất thành công." });
+      setCurrentUser(null);
+      toast({
+        title: "Đã Đăng Xuất",
+        description: "Bạn đã đăng xuất thành công.",
+      });
       setMessages([]);
       setCurrentBookingDetails({});
       setShowBookingForm(false);
-      fetchInitialMessageAndFocus(); 
+      fetchInitialMessageAndFocus();
     } catch (error) {
       console.error("Logout failed", error);
-      toast({ title: "Lỗi Đăng Xuất", description: "Không thể đăng xuất. Vui lòng thử lại.", variant: "destructive" });
+      toast({
+        title: "Lỗi Đăng Xuất",
+        description: "Không thể đăng xuất. Vui lòng thử lại.",
+        variant: "destructive",
+      });
     } finally {
       setIsLoading(false);
     }
   };
 
-  const getAvatarFallbackName = (email?: string | null, displayName?: string | null): string => {
+  const getAvatarFallbackName = (
+    email?: string | null,
+    displayName?: string | null
+  ): string => {
     if (displayName) {
-      const names = displayName.split(' ');
+      const names = displayName.split(" ");
       if (names.length > 1) {
         return `${names[0][0]}${names[names.length - 1][0]}`.toUpperCase();
       }
@@ -198,8 +344,8 @@ export default function BookingRoomPage() {
     if (email) {
       return email.substring(0, 2).toUpperCase();
     }
-    return <UserIcon size={20}/> as any; 
-  }
+    return (<UserIcon size={20} />) as any;
+  };
 
   return (
     <div className="flex min-h-screen bg-background text-foreground relative">
@@ -212,27 +358,54 @@ export default function BookingRoomPage() {
             </CardTitle>
             <div className="flex items-center gap-2">
               {Object.keys(currentBookingDetails).length > 0 && (
-                 <Button onClick={handleEditDetails} variant="ghost" size="icon" title="Xem lại & Xác nhận Chi tiết" disabled={isLoading}>
-                   <Edit3 size={20} />
-                 </Button>
+                <Button
+                  onClick={handleEditDetails}
+                  variant="ghost"
+                  size="icon"
+                  title="Xem lại & Xác nhận Chi tiết"
+                  disabled={isLoading}
+                >
+                  <Edit3 size={20} />
+                </Button>
               )}
-              <Button variant="ghost" size="icon" onClick={handleStartOver} title="Bắt đầu lại" disabled={isLoading}>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleStartOver}
+                title="Bắt đầu lại"
+                disabled={isLoading}
+              >
                 <RotateCcw size={20} />
               </Button>
             </div>
           </div>
           <CardDescription className="text-foreground/70">
-            Trò chuyện với AI của chúng tôi để đặt phòng. Nhập yêu cầu của bạn dưới đây.
+            Trò chuyện với AI của chúng tôi để đặt phòng. Nhập yêu cầu của bạn
+            dưới đây.
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
-          <ScrollArea className="h-[calc(50vh-40px)] md:h-[calc(60vh-40px)] p-6" ref={scrollAreaRef}>
+          <ScrollArea
+            className="h-[calc(50vh-40px)] md:h-[calc(60vh-40px)] p-6"
+            ref={scrollAreaRef}
+          >
             {messages.map((msg) => (
-              <ChatMessageItem key={msg.id} sender={msg.sender} text={msg.text} timestamp={msg.timestamp} />
+              <ChatMessageItem
+                key={msg.id}
+                sender={msg.sender}
+                text={msg.text}
+                timestamp={msg.timestamp}
+              />
             ))}
-            {isLoading && messages.length > 0 && messages[messages.length-1].sender === 'user' && (
-              <ChatMessageItem sender="ai" text="Đang xử lý..." timestamp={new Date()} />
-            )}
+            {isLoading &&
+              messages.length > 0 &&
+              messages[messages.length - 1].sender === "user" && (
+                <ChatMessageItem
+                  sender="ai"
+                  text="Đang xử lý..."
+                  timestamp={new Date()}
+                />
+              )}
           </ScrollArea>
         </CardContent>
 
@@ -244,7 +417,9 @@ export default function BookingRoomPage() {
               placeholder="Nhập yêu cầu đặt phòng của bạn..."
               value={userInput}
               onChange={(e) => setUserInput(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && !isLoading && handleSendMessage()}
+              onKeyPress={(e) =>
+                e.key === "Enter" && !isLoading && handleSendMessage()
+              }
               className="flex-1 text-base py-3 px-4 border-border focus:border-primary ring-offset-background focus:ring-ring focus-visible:ring-2"
               disabled={isLoading}
             />
@@ -254,12 +429,18 @@ export default function BookingRoomPage() {
               className="px-6 py-3 text-base bg-primary hover:bg-primary/90 text-primary-foreground"
               aria-label="Gửi tin nhắn"
             >
-              {isLoading && messages.length > 0 && messages[messages.length-1].sender === 'user' ? <Loader2 className="animate-spin" size={20} /> : <Send size={20} />}
+              {isLoading &&
+              messages.length > 0 &&
+              messages[messages.length - 1].sender === "user" ? (
+                <Loader2 className="animate-spin" size={20} />
+              ) : (
+                <Send size={20} />
+              )}
             </Button>
           </div>
         </div>
       </Card>
-      { Object.keys(currentBookingDetails).length > 0 && (
+      {Object.keys(currentBookingDetails).length > 0 && (
         <div className="flex flex-col max-w-2xl shadow-2xl rounded-lg overflow-hidden border-primary/20 mx-auto my-auto">
           <BookingDetailsForm
             initialDetails={currentBookingDetails as ParsedBookingDetails}
@@ -275,11 +456,20 @@ export default function BookingRoomPage() {
         {currentUser ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative h-10 w-10 rounded-full">
+              <Button
+                variant="ghost"
+                className="relative h-10 w-10 rounded-full"
+              >
                 <Avatar className="h-9 w-9">
-                  <AvatarImage src={currentUser.photoURL || undefined} alt={currentUser.displayName || currentUser.email || 'User'} />
+                  <AvatarImage
+                    src={currentUser.photoURL || undefined}
+                    alt={currentUser.displayName || currentUser.email || "User"}
+                  />
                   <AvatarFallback>
-                    {getAvatarFallbackName(currentUser.email, currentUser.displayName)}
+                    {getAvatarFallbackName(
+                      currentUser.email,
+                      currentUser.displayName
+                    )}
                   </AvatarFallback>
                 </Avatar>
               </Button>
@@ -296,23 +486,29 @@ export default function BookingRoomPage() {
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
+              <DropdownMenuItem
+                onClick={handleLogout}
+                className="cursor-pointer"
+              >
                 <LogOut className="mr-2 h-4 w-4" />
                 <span>Đăng xuất</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         ) : (
-          <Button variant="outline" onClick={() => setIsAuthModalOpen(true)} disabled={isLoading}>
+          <Button
+            variant="outline"
+            onClick={() => setIsAuthModalOpen(true)}
+            disabled={isLoading}
+          >
             Đăng nhập / Đăng ký
           </Button>
         )}
       </div>
       <AuthModal
         isOpen={isAuthModalOpen}
-        onClose={() => setIsAuthModalOpen(false)} 
+        onClose={() => setIsAuthModalOpen(false)}
       />
     </div>
   );
 }
-
