@@ -205,13 +205,6 @@ export default function BookingRoomPage() {
     <div className="flex min-h-screen bg-background text-foreground relative">
       <SidebarNavigation />
       <Card className="flex-grow flex flex-col max-w-2xl shadow-2xl rounded-lg overflow-hidden border-primary/20 mx-auto my-auto">
-        <div className="flex justify-between items-center p-2 border-b border-border">
-            <div className="flex items-center gap-2"> 
-              {/* Keep this space for potential future left-aligned items */}
-            </div>
-            
-        </div>
-
         <CardHeader className="bg-card-foreground/5">
           <div className="flex justify-between items-center">
             <CardTitle className="text-2xl font-semibold flex items-center gap-2 text-primary">
@@ -232,8 +225,6 @@ export default function BookingRoomPage() {
             Trò chuyện với AI của chúng tôi để đặt phòng. Nhập yêu cầu của bạn dưới đây.
           </CardDescription>
         </CardHeader>
-
-
         <CardContent className="p-0">
           <ScrollArea className="h-[calc(50vh-40px)] md:h-[calc(60vh-40px)] p-6" ref={scrollAreaRef}>
             {messages.map((msg) => (
@@ -268,9 +259,8 @@ export default function BookingRoomPage() {
           </div>
         </div>
       </Card>
-
       { Object.keys(currentBookingDetails).length > 0 && (
-        <div className="w-full max-w-2xl mt-8">
+        <div className="flex flex-col max-w-2xl shadow-2xl rounded-lg overflow-hidden border-primary/20 mx-auto my-auto">
           <BookingDetailsForm
             initialDetails={currentBookingDetails as ParsedBookingDetails}
             onSubmit={handleConfirmBooking}
