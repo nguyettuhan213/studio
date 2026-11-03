@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Home, LayoutDashboard, Menu } from 'lucide-react';
+import { Home, LayoutDashboard, Sliders, Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 
@@ -28,8 +28,15 @@ export function SidebarNavigation() {
             <LayoutDashboard className="h-5 w-5" />
             Dashboard
           </Link>
+          <Link
+            href="/admin/workflows"
+            className="mx-[-0.65rem] flex items-center gap-4 rounded-xl px-3 py-2 text-muted-foreground hover:text-foreground"
+          >
+            <Sliders className="h-5 w-5" />
+            Cấu hình quy trình
+          </Link>
         </nav>
       </SheetContent>
     </Sheet>
-  )
-};
+  );
+}

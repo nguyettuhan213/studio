@@ -3,27 +3,39 @@
 
 import { db } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import type { ExtractBookingDetailsOutput } from '@/ai/flows/extract-booking-details';
 
 /**
- * Saves the booking details to Firestore.
- * @param bookingDetails The booking details extracted by the AI.
+ * Saves the workflow request details to Firestore dynamically.
+ * @param workflowId The ID of the workflow.
+ * @param details The extracted and validated workflow request details.
  * @returns The ID of the newly created document in Firestore.
- * @throws Error if saving to Firestore fails.
  */
-export async function saveBookingDetailsToFirestore(bookingDetails: ExtractBookingDetailsOutput): Promise<string> {
+export async function saveWorkflowDetailsToFirestore(
+  workflowId: string,
+  details: Record<string, any>
+): Promise<string> {
   try {
     const requestsCollectionRef = collection(db, "requests");
     const docRef = await addDoc(requestsCollectionRef, {
-      ...bookingDetails,
-      createdAt: serverTimestamp(), // Automatically adds the server's timestamp
-      status: 'pending', // Default status for new bookings
+      ...details,
+      workflowId,
+      createdAt: serverTimestamp(),
+      status: 'pending',
     });
-    console.log("Booking details saved to Firestore with ID: ", docRef.id);
+    console.log(`Workflow request [${workflowId}] saved to Firestore with ID:`, docRef.id);
     return docRef.id;
   } catch (error) {
-    console.error("Error saving booking details to Firestore: ", error);
-    // Re-throw a more generic error to avoid leaking too much detail to the client if this function were ever client-callable (though it's 'use server').
-    throw new Error("Failed to save booking details. Please try again later.");
+    console.error("Error saving workflow details to Firestore:", error);
+    throw new Error("Failed to save request details. Please try again later.");
   }
+}
+
+/**
+ * Backward-compatible wrapper for saving booking details to Firestore.
+ */
+export async function saveBookingDetailsToFirestore(
+  bookingDetails: Record<string, any>
+): Promise<string> {
+  const workflowId = bookingDetails.workflowId || 'room_booking';
+  return saveWorkflowDetailsToFirestore(workflowId, bookingDetails);
 }

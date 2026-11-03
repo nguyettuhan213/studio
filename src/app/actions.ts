@@ -7,6 +7,10 @@ import {
   type ExtractBookingDetailsOutput,
 } from "@/ai/flows/extract-booking-details";
 import {
+  extractWorkflowDetails,
+  type ExtractWorkflowDetailsOutput,
+} from "@/ai/flows/extract-workflow-details";
+import {
   handleMissingDetails,
   type HandleMissingDetailsInput,
   type HandleMissingDetailsOutput,
@@ -16,161 +20,164 @@ import {
   type AssessRequestValidityInput,
   type AssessRequestValidityOutput,
 } from "@/ai/flows/assess-request-validity";
-import { saveBookingDetailsToFirestore } from "@/services/booking-service"; // Added import
+import {
+  saveBookingDetailsToFirestore,
+  saveWorkflowDetailsToFirestore,
+} from "@/services/booking-service";
+import {
+  getWorkflows,
+  getWorkflowById,
+  validateExtractedValues,
+} from "@/services/workflow-service";
+import type { WorkflowConfig, WorkflowValidationResult } from "@/types/workflow";
 
-// Re-export AI types for client-side usage if needed, or define specific types for actions
-export type { ExtractBookingDetailsOutput as ParsedBookingDetails };
-export type { HandleMissingDetailsOutput as MissingDetailsResponse };
-export type { AssessRequestValidityOutput as ValidityResponse };
-
-type ParsedBookingDetails = ExtractBookingDetailsOutput;
-type MissingDetailsResponse = HandleMissingDetailsOutput;
-type ValidityResponse = AssessRequestValidityOutput;
+// Re-export AI types for client-side usage
+export type ParsedBookingDetails = Record<string, any>;
+export type MissingDetailsResponse = HandleMissingDetailsOutput;
+export type ValidityResponse = AssessRequestValidityOutput;
 
 export async function getInitialBotMessage(): Promise<string> {
-  return "Xin chào! Tôi là trợ lý đặt phòng AI của bạn. Tôi có thể giúp bạn tìm và đặt phòng như thế nào hôm nay? Vui lòng mô tả những gì bạn đang tìm kiếm.";
+  return "Xin chào! Tôi là trợ lý AI. Tôi có thể hỗ trợ bạn thực hiện các thủ tục và quy trình trong hệ thống. Vui lòng mô tả yêu cầu của bạn bằng ngôn ngữ tự nhiên để bắt đầu.";
 }
 
 export async function processUserMessage(
   userInput: string,
-  currentAccumulatedDetails: Partial<ExtractBookingDetailsOutput>
+  currentAccumulatedDetails: Record<string, any> = {},
+  currentWorkflowId?: string | null,
+  conversationHistory?: Array<{ sender: "user" | "ai"; text: string }>
 ): Promise<{
-  updatedDetails: ParsedBookingDetails; // Use the exported type alias
-  missingDetailsResponse: MissingDetailsResponse;
+  updatedDetails: Record<string, any>;
+  workflowId: string | null;
+  workflowName: string | null;
+  isWorkflowIdentified: boolean;
+  missingDetailsResponse?: MissingDetailsResponse;
   aiMessage: string;
+  validation?: WorkflowValidationResult | null;
   error?: string;
 }> {
   try {
-    const extractionInput: ExtractBookingDetailsInput = { request: userInput };
-    const newlyExtracted = await extractBookingDetails(extractionInput);
-
-    const updatedDetails: ParsedBookingDetails = {
-      ...currentAccumulatedDetails,
-    } as ParsedBookingDetails;
-    // Merge details: prioritize newly extracted non-empty values
-    for (const key in newlyExtracted) {
-      const typedKey = key as keyof ParsedBookingDetails;
-      const newValue = newlyExtracted[typedKey];
-      if (
-        newValue !== null &&
-        newValue !== undefined &&
-        (typeof newValue !== "string" || newValue !== "")
-      ) {
-        (updatedDetails[typedKey] as any) = newValue;
-      } else if (
-        !(typedKey in updatedDetails) ||
-        updatedDetails[typedKey] === null ||
-        updatedDetails[typedKey] === undefined
-      ) {
-        (updatedDetails[typedKey] as any) = newValue; // Keep new (even if empty) if old was not set
-      }
-    }
-
-    // Ensure all fields defined in ParsedBookingDetails (ExtractBookingDetailsOutput) are present,
-    // even if they are empty strings or default values from the AI.
-    const defaultsFromSchema = z
-      .object({
-        room: z.string().describe("Phòng được yêu cầu đặt."),
-        date: z
-          .string()
-          .describe(
-            "Ngày đặt phòng, ưu tiên định dạng ISO 8601 (ví dụ: 2025-04-01)."
-          ),
-        time: z
-          .string()
-          .describe(
-            "Khoảng thời gian đặt phòng dưới dạng chuỗi dễ đọc (ví dụ: 10:30 SA - 12:30 CH GMT+7)."
-          ),
-        purpose: z
-          .string()
-          .describe(
-            "Mục đích của việc đặt phòng (ví dụ: Hội thảo AI hàng tuần)."
-          ),
-        estimated_number_of_attendees: z
-          .number()
-          .describe("Số lượng người tham dự dự kiến."),
-        special_requirements: z
-          .string()
-          .describe(
-            "Bất kỳ yêu cầu đặc biệt nào cho việc đặt phòng (ví dụ: Máy chiếu, bảng trắng, và quyền truy cập vào ổ cắm điện)."
-          ),
-        target_email: z
-          .string()
-          .describe("Email người nhận để xác nhận hoặc xử lý yêu cầu."),
-        cc_email: z
-          .string()
-          .optional()
-          .describe("Địa chỉ email CC tùy chọn cho xác nhận đặt phòng."),
-        requestorMail: z.string().describe("Email của người yêu cầu."),
-        requestorMSSV: z
-          .string()
-          .describe("Mã số sinh viên (MSSV) của người yêu cầu."),
-        requestorRole: z
-          .string()
-          .describe(
-            "Vai trò của người yêu cầu trong câu lạc bộ hoặc tổ chức của họ (ví dụ: Trưởng ban)."
-          ),
-        requestorDept: z
-          .string()
-          .describe(
-            "Khoa hoặc phòng ban của người yêu cầu (ví dụ: Khoa Khoa học)."
-          ),
-        CLB: z
-          .string()
-          .describe(
-            "Tên câu lạc bộ hoặc tổ chức (CLB) thực hiện yêu cầu (ví dụ: Edtech)."
-          ),
-        requestorName: z.string().describe("Họ tên đầy đủ của người yêu cầu."),
-      })
-      .parse(newlyExtracted); // Get defaults if schema defines them
-    Object.keys(defaultsFromSchema).forEach((key) => {
-      const typedKey = key as keyof ParsedBookingDetails;
-      if (updatedDetails[typedKey] === undefined) {
-        (updatedDetails[typedKey] as any) = defaultsFromSchema[typedKey];
-      }
+    // 1. Dynamic multi-workflow extraction using Gemini API
+    const extractionResult = await extractWorkflowDetails({
+      request: userInput,
+      preferredWorkflowId: currentWorkflowId || undefined,
+      conversationHistory,
     });
 
-    const missingDetailsInput = updatedDetails as HandleMissingDetailsInput; // Assuming structure matches
-    const missingDetailsResponse = await handleMissingDetails(
-      missingDetailsInput
-    );
-
-    let aiMessage = "Cảm ơn bạn đã cung cấp thông tin. ";
-    if (
-      !missingDetailsResponse.isComplete &&
-      missingDetailsResponse.followUpQuestions.length > 0
-    ) {
-      aiMessage += `Tôi vẫn cần thêm một chút thông tin: ${missingDetailsResponse.followUpQuestions.join(
-        " "
-      )}`;
-    } else if (missingDetailsResponse.isComplete) {
-      aiMessage +=
-        "Tôi nghĩ rằng tôi đã có đầy đủ các chi tiết. Vui lòng xem lại chúng dưới đây và xác nhận nếu mọi thứ đều chính xác.";
-    } else {
-      aiMessage +=
-        "Tôi có thể giúp gì khác cho bạn liên quan đến việc đặt phòng này không?";
+    // If intent is ambiguous or workflow cannot be identified
+    if (!extractionResult.workflowId || !extractionResult.isConfident) {
+      return {
+        updatedDetails: {},
+        workflowId: null,
+        workflowName: null,
+        isWorkflowIdentified: false,
+        aiMessage:
+          extractionResult.clarificationMessage ||
+          "Xin lỗi, tôi chưa rõ bạn muốn thực hiện quy trình nào. Vui lòng mô tả rõ hơn yêu cầu của bạn.",
+        validation: null,
+      };
     }
 
-    return { updatedDetails, missingDetailsResponse, aiMessage };
+    const workflow = await getWorkflowById(extractionResult.workflowId);
+    if (!workflow) {
+      return {
+        updatedDetails: {},
+        workflowId: null,
+        workflowName: null,
+        isWorkflowIdentified: false,
+        aiMessage:
+          "Xin lỗi, quy trình bạn yêu cầu hiện không có trong hệ thống. Vui lòng chọn một quy trình khác.",
+        validation: null,
+      };
+    }
+
+    // 2. Merge details: if switching workflows, start fresh with new workflow fields; otherwise merge
+    const isSameWorkflow =
+      Boolean(currentWorkflowId) && currentWorkflowId === workflow.id;
+    const baseDetails = isSameWorkflow ? { ...currentAccumulatedDetails } : {};
+
+    const updatedDetails: Record<string, any> = { ...baseDetails };
+
+    // Update with newly extracted non-empty values
+    for (const field of workflow.fields) {
+      const newVal = extractionResult.extractedDetails[field.name];
+      if (newVal !== undefined && newVal !== null && newVal !== "") {
+        updatedDetails[field.name] = newVal;
+      }
+    }
+
+    // 3. Validate extracted values against field types and required-field rules
+    const validation = validateExtractedValues(workflow, updatedDetails);
+
+    // 4. Format missing fields & follow-up messages
+    const missingFieldDisplayNames = validation.missingFields.map((fName) => {
+      const f = workflow.fields.find((fld) => fld.name === fName);
+      return f ? (f.label || f.displayName) : fName;
+    });
+
+    const missingDetailsResponse: MissingDetailsResponse = {
+      missingDetails: validation.missingFields,
+      followUpQuestions:
+        validation.missingFields.length > 0
+          ? [
+              `Vui lòng cung cấp thêm thông tin: ${missingFieldDisplayNames.join(
+                ", "
+              )}.`,
+            ]
+          : [],
+      isComplete: validation.isValid,
+    };
+
+    let aiMessage = "";
+    const isFirstIdentification = !currentWorkflowId || currentWorkflowId !== workflow.id;
+    const prefix = isFirstIdentification
+      ? `Tôi đã nhận diện bạn muốn thực hiện quy trình [${workflow.name}]. `
+      : "";
+
+    if (!validation.isValid && validation.missingFields.length > 0) {
+      aiMessage = `${prefix}Để hoàn tất quy trình [${workflow.name}], tôi vẫn cần thêm các thông tin: ${missingFieldDisplayNames.join(
+        ", "
+      )}. Bạn có thể trả lời trực tiếp hoặc điền vào biểu mẫu bên cạnh.`;
+    } else if (validation.isValid) {
+      aiMessage = `${prefix}Tuyệt vời! Tôi đã nhận đầy đủ các thông tin cần thiết cho quy trình [${workflow.name}]. Vui lòng xem lại biểu mẫu bên cạnh và nhấn Xác nhận để gửi yêu cầu.`;
+    } else {
+      aiMessage = `${prefix}Tôi đã ghi nhận thông tin cho quy trình [${workflow.name}].`;
+    }
+
+    // Append type error warnings if any
+    const typeErrors = validation.errors.filter(
+      (err) => !err.includes("là bắt buộc")
+    );
+    if (typeErrors.length > 0) {
+      aiMessage += ` (Lưu ý kiểm tra lại: ${typeErrors.join("; ")})`;
+    }
+
+    return {
+      updatedDetails,
+      workflowId: workflow.id,
+      workflowName: workflow.name,
+      isWorkflowIdentified: true,
+      missingDetailsResponse,
+      aiMessage,
+      validation,
+    };
   } catch (e: any) {
     console.error("Error processing user message:", e);
     const errorMessage =
       e.message ||
-      "Xin lỗi, tôi đã gặp lỗi. Bạn có thể thử diễn đạt lại hoặc cung cấp lại thông tin chi tiết không?";
+      "Xin lỗi, tôi đã gặp lỗi khi xử lý tin nhắn. Bạn có thể thử diễn đạt lại không?";
     return {
-      updatedDetails: currentAccumulatedDetails as ParsedBookingDetails,
-      missingDetailsResponse: {
-        missingDetails: [],
-        followUpQuestions: [errorMessage],
-        isComplete: false,
-      },
+      updatedDetails: currentWorkflowId ? currentAccumulatedDetails : {},
+      workflowId: currentWorkflowId || null,
+      workflowName: null,
+      isWorkflowIdentified: Boolean(currentWorkflowId),
       aiMessage: errorMessage,
+      validation: null,
       error: errorMessage,
     };
   }
 }
 
-const startFlowN8N = async (finalDetails: ParsedBookingDetails) => {
+const startFlowN8N = async (finalDetails: Record<string, any>) => {
   const varFlowN8NURL =
     "https://loudly-good-ghost.ngrok-free.app/webhook/888f6aa2-c9a9-44ac-ab30-bbf11a76de59";
   const varQuery = {
@@ -190,59 +197,106 @@ const startFlowN8N = async (finalDetails: ParsedBookingDetails) => {
   }
 };
 
-export async function submitBookingRequest(
-  finalDetails: ParsedBookingDetails
+export async function submitWorkflowRequest(
+  workflowId: string,
+  finalDetails: Record<string, any>
 ): Promise<{
   validityResponse: ValidityResponse;
   aiMessage: string;
-  bookingId?: string; // Optional: return bookingId on success
+  requestId?: string;
   error?: string;
 }> {
   try {
-    const validityInput = finalDetails as AssessRequestValidityInput;
-    const validityResponse = await assessRequestValidity(validityInput);
-
-    let aiMessage = "";
-    let bookingId: string | undefined = undefined;
-    let startedFlow: any;
-
-    if (validityResponse.isValid) {
-      try {
-        bookingId = await saveBookingDetailsToFirestore(finalDetails);
-        startedFlow = await startFlowN8N(validityInput);
-        aiMessage = `Tuyệt vời! Yêu cầu đặt phòng của bạn (ID: ${bookingId}) đã được lưu thành công và đang chờ xác nhận. Bạn sẽ sớm nhận được email.`;
-      } catch (saveError: any) {
-        console.error("Error saving booking to Firestore:", saveError);
-        validityResponse.isValid = false;
-        validityResponse.errors = validityResponse.errors || [];
-        validityResponse.errors.push(
-          "Không thể lưu chi tiết đặt phòng của bạn. Vui lòng thử lại."
-        );
-        aiMessage = `Đã có sự cố khi lưu đặt phòng của bạn: ${
-          saveError.message || "Vui lòng thử lại."
-        }`;
-        return {
-          validityResponse,
-          aiMessage,
-          error: saveError.message || "Không thể lưu đặt phòng.",
-        };
-      }
-    } else {
-      aiMessage = `Có một số vấn đề với yêu cầu của bạn: ${validityResponse.errors.join(
-        ". "
-      )}. Vui lòng sửa chúng và thử lại.`;
+    if (!workflowId) {
+      return {
+        validityResponse: {
+          isValid: false,
+          errors: ["Chưa xác định quy trình cần gửi yêu cầu."],
+        },
+        aiMessage: "Lỗi: Chưa xác định quy trình hợp lệ.",
+        error: "Missing workflow ID",
+      };
     }
 
-    return { validityResponse, aiMessage, bookingId };
+    const workflow = await getWorkflowById(workflowId);
+    if (!workflow) {
+      return {
+        validityResponse: {
+          isValid: false,
+          errors: [`Không tìm thấy quy trình với mã: ${workflowId}`],
+        },
+        aiMessage: `Lỗi: Không tìm thấy quy trình "${workflowId}".`,
+        error: "Workflow not found",
+      };
+    }
+    const validation = validateExtractedValues(workflow, finalDetails);
+
+    if (!validation.isValid) {
+      return {
+        validityResponse: {
+          isValid: false,
+          errors: validation.errors,
+        },
+        aiMessage: `Có một số thông tin chưa hợp lệ: ${validation.errors.join(
+          "; "
+        )}. Vui lòng bổ sung hoặc chỉnh sửa.`,
+      };
+    }
+
+    let requestId: string | undefined = undefined;
+    try {
+      // Save details to Firestore dynamically
+      requestId = await saveWorkflowDetailsToFirestore(workflow.id, {
+        ...finalDetails,
+        workflowName: workflow.name,
+      });
+
+      await startFlowN8N({ ...finalDetails, workflowId: workflow.id, requestId });
+
+      const aiMessage = `Tuyệt vời! Yêu cầu [${workflow.name}] của bạn (Mã: ${requestId}) đã được lưu thành công và đang chờ xử lý.`;
+      return {
+        validityResponse: { isValid: true, errors: [] },
+        aiMessage,
+        requestId,
+      };
+    } catch (saveError: any) {
+      console.error("Error saving workflow request:", saveError);
+      return {
+        validityResponse: {
+          isValid: false,
+          errors: [saveError.message || "Không thể lưu dữ liệu."],
+        },
+        aiMessage: `Đã có sự cố khi lưu yêu cầu: ${
+          saveError.message || "Vui lòng thử lại sau."
+        }`,
+        error: saveError.message,
+      };
+    }
   } catch (e: any) {
-    console.error("Error submitting booking request:", e);
+    console.error("Error submitting workflow request:", e);
     const errorMessage =
-      e.message ||
-      "Xin lỗi, đã xảy ra lỗi khi gửi yêu cầu của bạn. Vui lòng thử lại sau.";
+      e.message || "Xin lỗi, đã xảy ra lỗi khi gửi yêu cầu của bạn.";
     return {
       validityResponse: { isValid: false, errors: [errorMessage] },
       aiMessage: errorMessage,
       error: errorMessage,
     };
   }
+}
+
+export async function submitBookingRequest(
+  finalDetails: ParsedBookingDetails
+): Promise<{
+  validityResponse: ValidityResponse;
+  aiMessage: string;
+  bookingId?: string;
+  error?: string;
+}> {
+  const result = await submitWorkflowRequest("room_booking", finalDetails);
+  return {
+    validityResponse: result.validityResponse,
+    aiMessage: result.aiMessage,
+    bookingId: result.requestId,
+    error: result.error,
+  };
 }
