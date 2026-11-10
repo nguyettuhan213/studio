@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { signin, signup, signInWithGoogle } from '@/services/auth-service';
+import { signin, signup, signInWithGoogle } from '@/lib/auth-service';
 import { Button } from '../ui/button'; // Assuming you have a Button component
 import { Input } from '../ui/input'; // Assuming you have an Input component
 import { Label } from '../ui/label'; // Assuming you have a Label component

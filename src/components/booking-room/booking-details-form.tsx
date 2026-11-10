@@ -2,7 +2,7 @@
 "use client";
 
 import type { FC } from "react";
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { Button } from "@/components/ui/button";
 import { Input as UiInput } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,48 +23,35 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { CheckCircle, Save, Info, ListFilter } from "lucide-react";
-import type { WorkflowConfig, WorkflowFieldConfig, FieldType } from "@/types/workflow";
-import { resolveFieldOptions } from "@/lib/workflow-utils";
+import type { FieldType } from "@/types/workflow";
+import type { ApiWorkflow, ApiWorkflowField } from "@/types/api";
+import { displayValue, type FieldValues } from "@/lib/field-store";
 
 interface BookingDetailsFormProps {
-  initialDetails: Record<string, any>;
-  workflowConfig?: WorkflowConfig | null;
-  onSubmit: (details: Record<string, any>) => void;
+  /** The shared field store (all workflows); only this workflow's fields are shown. */
+  values: FieldValues;
+  workflowConfig?: ApiWorkflow | null;
+  /** Every edit is written straight to the shared store, so it survives chat turns and reopening. */
+  onFieldChange: (name: string, value: string | number | undefined) => void;
+  onSubmit: () => void;
   onCancel?: () => void;
+  /** A request is in flight (shows "Đang gửi..."). */
   isLoading?: boolean;
+  /** Read-only without loading text, e.g. while waiting for the post-submit Keep/Clear choice. */
+  locked?: boolean;
 }
 
 const BookingDetailsForm: FC<BookingDetailsFormProps> = ({
-  initialDetails,
+  values,
   workflowConfig,
+  onFieldChange,
   onSubmit,
   onCancel,
   isLoading,
+  locked,
 }) => {
-  const [formData, setFormData] = useState<Record<string, any>>(initialDetails);
-
-  // Initialize or update form data with initial details and default values
-  // Only retain fields defined in the active workflowConfig to prevent stale data
-  useEffect(() => {
-    const updated: Record<string, any> = {};
-    if (workflowConfig?.fields) {
-      for (const field of workflowConfig.fields) {
-        if (
-          initialDetails &&
-          initialDetails[field.name] !== undefined &&
-          initialDetails[field.name] !== null &&
-          initialDetails[field.name] !== ""
-        ) {
-          updated[field.name] = initialDetails[field.name];
-        } else if (field.valueHandling?.defaultValue !== undefined) {
-          updated[field.name] = field.valueHandling.defaultValue;
-        }
-      }
-    }
-    setFormData(updated);
-  }, [initialDetails, workflowConfig]);
-
-  const fields: WorkflowFieldConfig[] = workflowConfig?.fields || [];
+  const disabled = isLoading || locked;
+  const fields: ApiWorkflowField[] = workflowConfig?.fields || [];
   const layoutColumns = workflowConfig?.layout?.columns || 2;
   const submitText = workflowConfig?.layout?.submitButtonText || "Xác nhận & Gửi Yêu cầu";
   const cancelText = workflowConfig?.layout?.cancelButtonText || "Hủy";
@@ -74,15 +61,12 @@ const BookingDetailsForm: FC<BookingDetailsFormProps> = ({
     if (type === "number") {
       finalValue = value === "" || value === undefined ? undefined : Number(value);
     }
-    setFormData((prev) => ({
-      ...prev,
-      [name]: finalValue,
-    }));
+    onFieldChange(name, finalValue);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(formData);
+    onSubmit();
   };
 
   return (
@@ -109,9 +93,10 @@ const BookingDetailsForm: FC<BookingDetailsFormProps> = ({
               const component = displaySettings.component || "input";
               const colSpan = displaySettings.colSpan || (component === "textarea" ? 2 : 1);
               const isFullWidth = colSpan === 2 && layoutColumns === 2;
-              const fieldOptions = resolveFieldOptions(field) || displaySettings.options;
+              const fieldOptions = field.resolvedOptions || displaySettings.options;
               const isSelect = field.type === "option" || component === "select";
               const label = field.label || field.displayName || field.name;
+              const current = displayValue(values, field);
               const placeholder =
                 displaySettings.placeholder ||
                 field.placeholder ||
@@ -161,22 +146,22 @@ const BookingDetailsForm: FC<BookingDetailsFormProps> = ({
                     <Textarea
                       id={field.name}
                       name={field.name}
-                      value={formData[field.name]?.toString() || ""}
+                      value={current?.toString() || ""}
                       onChange={(e) =>
                         handleFieldChange(field.name, e.target.value, field.type)
                       }
                       rows={3}
                       className="mt-1 bg-background/50 border-border focus:border-primary text-sm"
-                      disabled={isLoading}
+                      disabled={disabled}
                       placeholder={placeholder}
                     />
                   ) : isSelect && Array.isArray(fieldOptions) && fieldOptions.length > 0 ? (
                     <Select
-                      value={formData[field.name]?.toString() || ""}
+                      value={current?.toString() || ""}
                       onValueChange={(val) =>
                         handleFieldChange(field.name, val, field.type)
                       }
-                      disabled={isLoading}
+                      disabled={disabled}
                     >
                       <SelectTrigger className="mt-1 bg-background/50 border-border focus:border-primary text-sm">
                         <SelectValue placeholder={placeholder} />
@@ -194,16 +179,12 @@ const BookingDetailsForm: FC<BookingDetailsFormProps> = ({
                       id={field.name}
                       name={field.name}
                       type={field.type === "number" ? "number" : "text"}
-                      value={
-                        formData[field.name] !== undefined && formData[field.name] !== null
-                          ? formData[field.name]
-                          : ""
-                      }
+                      value={current ?? ""}
                       onChange={(e) =>
                         handleFieldChange(field.name, e.target.value, field.type)
                       }
                       className="mt-1 bg-background/50 border-border focus:border-primary text-sm"
-                      disabled={isLoading}
+                      disabled={disabled}
                       min={field.valueHandling?.min}
                       max={field.valueHandling?.max}
                       placeholder={placeholder}
@@ -220,14 +201,14 @@ const BookingDetailsForm: FC<BookingDetailsFormProps> = ({
               type="button"
               variant="outline"
               onClick={onCancel}
-              disabled={isLoading}
+              disabled={disabled}
             >
               {cancelText}
             </Button>
           )}
           <Button
             type="submit"
-            disabled={isLoading}
+            disabled={disabled}
             className="bg-primary hover:bg-primary/90 text-primary-foreground"
           >
             {isLoading ? "Đang gửi..." : submitText}

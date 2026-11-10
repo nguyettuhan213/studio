@@ -50,18 +50,8 @@ import {
 } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import { SidebarNavigation } from "@/components/navigation/sidebar";
-import {
-  getWorkflowsAction,
-  saveWorkflowAction,
-  deleteWorkflowAction,
-  resetWorkflowsAction,
-  getFieldDefinitionsAction,
-} from "@/app/admin/actions";
-import {
-  getAllPredefinedOptionKeys,
-  isValidPredefinedOptionKey,
-  getPredefinedOptions,
-} from "@/config/predefined-options";
+import { api } from "@/lib/api-client";
+import type { ApiOptionSet } from "@/types/api";
 import type {
   WorkflowConfig,
   RawWorkflowConfig,
@@ -78,8 +68,13 @@ export default function AdminWorkflowsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isNewWorkflow, setIsNewWorkflow] = useState(false);
 
-  // Predefined options metadata
-  const predefinedOptionList = getAllPredefinedOptionKeys();
+  // Predefined option sets (loaded from the backend)
+  const [optionSets, setOptionSets] = useState<ApiOptionSet[]>([]);
+  const predefinedOptionList = optionSets.map((o) => ({ ...o, count: o.values.length }));
+  const isValidPredefinedOptionKey = (key?: string) =>
+    Boolean(key) && optionSets.some((o) => o.key === key);
+  const getPredefinedOptions = (key?: string) =>
+    optionSets.find((o) => o.key === key)?.values;
 
   // Form state for editing/creating a workflow
   const [currentId, setCurrentId] = useState("");
@@ -99,12 +94,14 @@ export default function AdminWorkflowsPage() {
   const fetchWorkflows = async () => {
     setIsLoading(true);
     try {
-      const [data, defs] = await Promise.all([
-        getWorkflowsAction(),
-        getFieldDefinitionsAction(),
+      const [data, defs, options] = await Promise.all([
+        api.getWorkflows(),
+        api.getFieldDefinitions(),
+        api.getOptions(),
       ]);
       setWorkflows(data);
       setFieldDefinitions(defs || {});
+      setOptionSets(options);
     } catch (error: any) {
       toast({
         title: "Lỗi tải dữ liệu",
@@ -382,25 +379,19 @@ export default function AdminWorkflowsPage() {
 
     setIsSaving(true);
     try {
-      const res = await saveWorkflowAction(workflowToSave, isNewWorkflow);
-      if (res.success) {
-        toast({
-          title: "Thành công!",
-          description: `Đã lưu cấu hình quy trình "${workflowToSave.name}".`,
-        });
-        setIsDialogOpen(false);
-        fetchWorkflows();
-      } else {
-        toast({
-          title: "Lỗi lưu quy trình",
-          description: res.error || "Không thể lưu quy trình.",
-          variant: "destructive",
-        });
-      }
+      await (isNewWorkflow
+        ? api.createWorkflow(workflowToSave)
+        : api.updateWorkflow(workflowToSave));
+      toast({
+        title: "Thành công!",
+        description: `Đã lưu cấu hình quy trình "${workflowToSave.name}".`,
+      });
+      setIsDialogOpen(false);
+      fetchWorkflows();
     } catch (err: any) {
       toast({
-        title: "Lỗi",
-        description: err.message || "Đã xảy ra lỗi khi lưu.",
+        title: "Lỗi lưu quy trình",
+        description: err.message || "Không thể lưu quy trình.",
         variant: "destructive",
       });
     } finally {
@@ -423,24 +414,16 @@ export default function AdminWorkflowsPage() {
     }
 
     try {
-      const res = await deleteWorkflowAction(id);
-      if (res.success) {
-        toast({
-          title: "Đã xóa quy trình",
-          description: `Đã xóa quy trình "${name}".`,
-        });
-        fetchWorkflows();
-      } else {
-        toast({
-          title: "Lỗi xóa quy trình",
-          description: res.error || "Không thể xóa quy trình.",
-          variant: "destructive",
-        });
-      }
+      await api.deleteWorkflow(id);
+      toast({
+        title: "Đã xóa quy trình",
+        description: `Đã xóa quy trình "${name}".`,
+      });
+      fetchWorkflows();
     } catch (err: any) {
       toast({
-        title: "Lỗi",
-        description: err.message || "Đã xảy ra lỗi khi xóa.",
+        title: "Lỗi xóa quy trình",
+        description: err.message || "Không thể xóa quy trình.",
         variant: "destructive",
       });
     }
@@ -456,24 +439,16 @@ export default function AdminWorkflowsPage() {
     }
 
     try {
-      const res = await resetWorkflowsAction();
-      if (res.success) {
-        toast({
-          title: "Đã khôi phục mặc định",
-          description: "Các quy trình đã được đặt lại về cấu hình chuẩn.",
-        });
-        fetchWorkflows();
-      } else {
-        toast({
-          title: "Lỗi khôi phục",
-          description: res.error || "Không thể khôi phục mặc định.",
-          variant: "destructive",
-        });
-      }
+      await api.resetWorkflows();
+      toast({
+        title: "Đã khôi phục mặc định",
+        description: "Các quy trình đã được đặt lại về cấu hình chuẩn.",
+      });
+      fetchWorkflows();
     } catch (err: any) {
       toast({
-        title: "Lỗi",
-        description: err.message,
+        title: "Lỗi khôi phục",
+        description: err.message || "Không thể khôi phục mặc định.",
         variant: "destructive",
       });
     }

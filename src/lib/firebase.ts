@@ -1,7 +1,6 @@
-// src/lib/firebase.ts
+// src/lib/firebase.ts — client-side Firebase Auth only. Firestore is accessed by the backend.
 import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
-import { getAuth, type Auth } from "firebase/auth"; // Import Auth
-import { getFirestore, type Firestore } from "firebase/firestore";
+import { getAuth, type Auth } from "firebase/auth";
 
 // Your web app's Firebase configuration
 // Ensure these environment variables are set in your .env.local file
@@ -14,17 +13,7 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-let app: FirebaseApp;
-let db: Firestore;
-let auth: Auth; // Declare auth
+const app: FirebaseApp = getApps()[0] ?? initializeApp(firebaseConfig);
+const auth: Auth = getAuth(app);
 
-if (getApps().length === 0) {
-  app = initializeApp(firebaseConfig);
-} else {
-  app = getApps()[0];
-}
-
-db = getFirestore(app);
-auth = getAuth(app); // Initialize Auth
-
-export { app, db, auth }; // Export auth
+export { app, auth };

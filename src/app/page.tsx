@@ -47,15 +47,21 @@ import BookingDetailsForm from "@/components/booking-room/booking-details-form";
 
 import AuthModal from "@/components/auth/auth-modal";
 import { SidebarNavigation } from "@/components/navigation/sidebar";
-import { observeAuthState, signout } from "@/services/auth-service";
+import { observeAuthState, signout } from "@/lib/auth-service";
+import { api, ApiError } from "@/lib/api-client";
+import type { ApiWorkflow } from "@/types/api";
 import {
-  processUserMessage,
-  submitWorkflowRequest,
-  getInitialBotMessage,
-} from "./actions";
-import { getWorkflowsAction } from "@/app/admin/actions";
-import { validateExtractedValues } from "@/lib/workflow-utils";
-import type { WorkflowConfig } from "@/types/workflow";
+  activeValues,
+  buildSubmission,
+  knownFieldNames,
+  matchSwitchReply,
+  mergeExtracted,
+  setFieldValue,
+  type FieldValues,
+} from "@/lib/field-store";
+
+const INITIAL_BOT_MESSAGE =
+  "Xin chào! Tôi là trợ lý AI. Tôi có thể hỗ trợ bạn thực hiện các thủ tục và quy trình trong hệ thống. Vui lòng mô tả yêu cầu của bạn bằng ngôn ngữ tự nhiên để bắt đầu.";
 
 interface ChatMessage {
   id: string;
@@ -68,14 +74,21 @@ export default function BookingRoomPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [userInput, setUserInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [currentBookingDetails, setCurrentBookingDetails] = useState<Record<string, any>>({});
+  // ONE shared store for all workflows, keyed by field name (see lib/field-store.ts)
+  const [fieldValues, setFieldValues] = useState<FieldValues>({});
+  // AI-proposed switch awaiting the user's confirmation; `message` is re-processed on confirm
+  const [pendingSwitch, setPendingSwitch] = useState<{ workflow: ApiWorkflow; message: string } | null>(null);
+  // After a successful submit the user must choose Keep or Clear before continuing
+  const [awaitingSubmitChoice, setAwaitingSubmitChoice] = useState(false);
   const [showBookingForm, setShowBookingForm] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   // Dynamic workflows state
-  const [workflows, setWorkflows] = useState<WorkflowConfig[]>([]);
-  const [activeWorkflow, setActiveWorkflow] = useState<WorkflowConfig | null>(null);
+  const [workflows, setWorkflows] = useState<ApiWorkflow[]>([]);
+  const [activeWorkflow, setActiveWorkflow] = useState<ApiWorkflow | null>(null);
+
+  const knownNames = React.useMemo(() => knownFieldNames(workflows), [workflows]);
 
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -94,7 +107,7 @@ export default function BookingRoomPage() {
   useEffect(() => {
     async function loadWorkflows() {
       try {
-        const list = await getWorkflowsAction();
+        const list = await api.getWorkflows();
         setWorkflows(list);
       } catch (err) {
         console.error("Failed to load workflows:", err);
@@ -130,26 +143,9 @@ export default function BookingRoomPage() {
     ]);
   }, []);
 
-  const fetchInitialMessageAndFocus = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const initialMessage = await getInitialBotMessage();
-      addMessage("ai", initialMessage);
-    } catch (error) {
-      addMessage(
-        "ai",
-        "Xin lỗi, tôi không thể bắt đầu cuộc trò chuyện. Vui lòng làm mới trang."
-      );
-      console.error("Failed to get initial bot message", error);
-      toast({
-        title: "Lỗi Kết Nối",
-        description: "Không thể tải tin nhắn ban đầu.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-      inputRef.current?.focus();
-    }
+  const fetchInitialMessageAndFocus = useCallback(() => {
+    addMessage("ai", INITIAL_BOT_MESSAGE);
+    inputRef.current?.focus();
   }, [addMessage]);
 
   useEffect(() => {
@@ -158,10 +154,11 @@ export default function BookingRoomPage() {
     }
   }, [fetchInitialMessageAndFocus, messages.length]);
 
-  const handleWorkflowChange = (newWorkflow: WorkflowConfig) => {
+  // Manual selection: only the active workflow changes; shared values are kept.
+  const handleWorkflowChange = (newWorkflow: ApiWorkflow) => {
     if (activeWorkflow?.id === newWorkflow.id) return;
     setActiveWorkflow(newWorkflow);
-    
+    setPendingSwitch(null);
     setShowBookingForm(true);
     addMessage(
       "ai",
@@ -173,68 +170,50 @@ export default function BookingRoomPage() {
     });
   };
 
-  const handleSendMessage = async () => {
-    if (!userInput.trim() || isLoading) return;
-    const text = userInput;
-    addMessage("user", text);
-    setUserInput("");
+  /** Sends a message to the AI under `workflow` (null = not identified yet) and applies the result. */
+  const sendToChat = async (text: string, workflow: ApiWorkflow | null) => {
     setIsLoading(true);
-
     try {
       const history = messages.slice(-6).map((m) => ({
         sender: m.sender,
         text: m.text,
       }));
 
-      const result = await processUserMessage(
-        text,
-        currentBookingDetails,
-        activeWorkflow?.id || null,
-        history
-      );
+      const result = await api.chat({
+        message: text,
+        values: activeValues(fieldValues, workflow),
+        workflowId: workflow?.id ?? null,
+        history,
+      });
 
-      if (result.error) {
-        addMessage("ai", result.error);
-        toast({
-          title: "Lỗi",
-          description: result.error,
-          variant: "destructive",
-        });
-      } else {
-        addMessage("ai", result.aiMessage);
+      addMessage("ai", result.aiMessage);
 
-        if (result.isWorkflowIdentified && result.workflowId) {
-          const matched = workflows.find((w) => w.id === result.workflowId);
-          if (matched) {
-            const isSwitch = Boolean(activeWorkflow && activeWorkflow.id !== matched.id);
-            const isFirst = !activeWorkflow;
+      // Explicit switch request: never switch automatically, ask the user first.
+      if (result.suggestedWorkflow) {
+        const target = workflows.find((w) => w.id === result.suggestedWorkflow!.id);
+        if (target) setPendingSwitch({ workflow: target, message: text });
+        return;
+      }
 
-            setActiveWorkflow(matched);
-            setCurrentBookingDetails(result.updatedDetails);
-            setShowBookingForm(true);
+      setFieldValues((prev) => mergeExtracted(prev, result.extracted, knownNames));
 
-            if (isSwitch) {
-              toast({
-                title: "Chuyển quy trình",
-                description: `Đã tự động chuyển sang quy trình: ${matched.name}`,
-              });
-            } else if (isFirst) {
-              toast({
-                title: "Nhận diện quy trình",
-                description: `Đã nhận diện quy trình: ${matched.name}`,
-              });
-            }
-          }
-        } else {
-          // If no workflow was identified, remain in null state and do not show form
-          if (!activeWorkflow) {
-            setShowBookingForm(false);
-            setCurrentBookingDetails({});
-          }
+      // First identification only: no confirmation, just notify. Afterwards the workflow is locked.
+      if (!workflow && result.isWorkflowIdentified && result.workflowId) {
+        const matched = workflows.find((w) => w.id === result.workflowId);
+        if (matched) {
+          setActiveWorkflow(matched);
+          setShowBookingForm(true);
+          toast({
+            title: "Nhận diện quy trình",
+            description: `Đã nhận diện quy trình: ${matched.name}`,
+          });
         }
       }
     } catch (error) {
-      const errorMsg = "Đã xảy ra lỗi không mong muốn. Vui lòng thử lại.";
+      const errorMsg =
+        error instanceof ApiError
+          ? error.message
+          : "Đã xảy ra lỗi không mong muốn. Vui lòng thử lại.";
       addMessage("ai", errorMsg);
       toast({
         title: "Lỗi Xử Lý",
@@ -248,23 +227,43 @@ export default function BookingRoomPage() {
     }
   };
 
-  const handleValidationForm = (detailsToConfirm: Record<string, any>) => {
-    if (!activeWorkflow) return false;
-
-    const result = validateExtractedValues(activeWorkflow, detailsToConfirm);
-    if (!result.isValid) {
-      toast({
-        title: "Lỗi xác thực",
-        description: result.errors[0] || "Thông tin chưa hợp lệ. Vui lòng kiểm tra lại.",
-        variant: "destructive",
-      });
-      return false;
-    }
-
-    return true;
+  const confirmSwitch = async () => {
+    const pending = pendingSwitch;
+    if (!pending) return;
+    setPendingSwitch(null);
+    setActiveWorkflow(pending.workflow);
+    setShowBookingForm(true);
+    addMessage("ai", `Đã chuyển sang quy trình [${pending.workflow.name}].`);
+    toast({
+      title: "Đã chọn quy trình",
+      description: `Đang thực hiện: ${pending.workflow.name}`,
+    });
+    // Re-process the message that triggered the suggestion under the confirmed workflow.
+    await sendToChat(pending.message, pending.workflow);
   };
 
-  const handleConfirmBooking = async (detailsToConfirm: Record<string, any>) => {
+  const keepCurrentWorkflow = () => {
+    setPendingSwitch(null);
+    addMessage("ai", `Tiếp tục với quy trình [${activeWorkflow?.name}].`);
+  };
+
+  const handleSendMessage = async () => {
+    if (!userInput.trim() || isLoading || awaitingSubmitChoice) return;
+    const text = userInput;
+    addMessage("user", text);
+    setUserInput("");
+
+    if (pendingSwitch) {
+      // A typed reply confirms/declines only when it is an explicit yes/no to the pending suggestion.
+      const reply = matchSwitchReply(text);
+      if (reply === "yes") return confirmSwitch();
+      if (reply === "no") return keepCurrentWorkflow();
+      setPendingSwitch(null); // any other message dismisses the suggestion; stay in the current workflow
+    }
+    await sendToChat(text, activeWorkflow);
+  };
+
+  const handleConfirmBooking = async () => {
     if (!activeWorkflow) {
       toast({
         title: "Lỗi",
@@ -274,8 +273,8 @@ export default function BookingRoomPage() {
       return;
     }
 
-    const validated = handleValidationForm(detailsToConfirm);
-    if (!validated) return;
+    // Only the active workflow's fields leave the browser, never the whole shared store.
+    const detailsToConfirm = buildSubmission(fieldValues, activeWorkflow);
 
     setIsLoading(true);
     setShowBookingForm(false);
@@ -284,29 +283,34 @@ export default function BookingRoomPage() {
       `Đang gửi yêu cầu [${activeWorkflow.name}] với các chi tiết đã cung cấp...`
     );
     try {
-      const result = await submitWorkflowRequest(
-        activeWorkflow.id,
-        detailsToConfirm
-      );
+      const result = await api.submitRequest({
+        workflowId: activeWorkflow.id,
+        details: detailsToConfirm,
+      });
       addMessage("ai", result.aiMessage);
-      if (result.validityResponse.isValid) {
-        toast({
-          title: "Thành Công!",
-          description: `Yêu cầu [${activeWorkflow.name}] đã được gửi thành công.`,
-        });
-        // Clear details and reset the form for the next request
-        setCurrentBookingDetails({});
-        setShowBookingForm(true);
-      } else {
+      addMessage(
+        "ai",
+        "Bạn muốn làm gì tiếp theo? Chọn \"Giữ dữ liệu và tiếp tục\" để giữ toàn bộ thông tin đã nhập, hoặc \"Xóa dữ liệu và bắt đầu lại\" để bắt đầu phiên mới."
+      );
+      toast({
+        title: "Thành Công!",
+        description: `Yêu cầu [${activeWorkflow.name}] đã được gửi thành công.`,
+      });
+      // Never clear or keep automatically: the user must choose (input & submit locked until then).
+      setAwaitingSubmitChoice(true);
+      setShowBookingForm(true);
+    } catch (error) {
+      if (error instanceof ApiError && error.status !== 0 && error.status < 500) {
+        // Validation / not-found: show the backend's message; the input stays in the shared store
+        addMessage("ai", error.message);
         toast({
           title: "Xác Thực Thất Bại",
-          description: result.aiMessage,
+          description: error.message,
           variant: "destructive",
         });
         setShowBookingForm(true);
-        setCurrentBookingDetails(detailsToConfirm);
+        return;
       }
-    } catch (error) {
       const errorMsg = "Đã xảy ra lỗi trong quá trình gửi. Vui lòng thử lại.";
       addMessage("ai", errorMsg);
       toast({
@@ -315,7 +319,6 @@ export default function BookingRoomPage() {
         variant: "destructive",
       });
       setShowBookingForm(true);
-      setCurrentBookingDetails(detailsToConfirm);
       console.error("Failed to confirm request", error);
     } finally {
       setIsLoading(false);
@@ -329,10 +332,13 @@ export default function BookingRoomPage() {
     }
   };
 
+  // Existing behavior: clears the chat and all unsubmitted shared data (submitted records untouched).
   const handleStartOver = () => {
     setMessages([]);
     setActiveWorkflow(null);
-    setCurrentBookingDetails({});
+    setFieldValues({});
+    setPendingSwitch(null);
+    setAwaitingSubmitChoice(false);
     setShowBookingForm(false);
     fetchInitialMessageAndFocus();
     toast({
@@ -352,7 +358,9 @@ export default function BookingRoomPage() {
       });
       setMessages([]);
       setActiveWorkflow(null);
-      setCurrentBookingDetails({});
+      setFieldValues({});
+      setPendingSwitch(null);
+      setAwaitingSubmitChoice(false);
       setShowBookingForm(false);
       fetchInitialMessageAndFocus();
     } catch (error) {
@@ -477,6 +485,35 @@ export default function BookingRoomPage() {
         </CardContent>
 
         <div className="border-t border-border p-4 bg-card-foreground/5">
+          {pendingSwitch && !isLoading && (
+            <div className="flex flex-wrap gap-2 mb-3">
+              <Button size="sm" onClick={confirmSwitch}>
+                Chuyển sang {pendingSwitch.workflow.name}
+              </Button>
+              <Button size="sm" variant="outline" onClick={keepCurrentWorkflow}>
+                Giữ {activeWorkflow?.name}
+              </Button>
+            </div>
+          )}
+          {awaitingSubmitChoice && (
+            <div className="flex flex-wrap gap-2 mb-3">
+              <Button
+                size="sm"
+                onClick={() => {
+                  setAwaitingSubmitChoice(false);
+                  addMessage(
+                    "ai",
+                    "Đã giữ toàn bộ dữ liệu. Bạn có thể tiếp tục chỉnh sửa, gửi yêu cầu khác hoặc chuyển quy trình."
+                  );
+                }}
+              >
+                Giữ dữ liệu và tiếp tục
+              </Button>
+              <Button size="sm" variant="outline" onClick={handleStartOver}>
+                Xóa dữ liệu và bắt đầu lại
+              </Button>
+            </div>
+          )}
           <div className="flex items-center gap-3">
             <UiInput
               ref={inputRef}
@@ -492,11 +529,11 @@ export default function BookingRoomPage() {
                 e.key === "Enter" && !isLoading && handleSendMessage()
               }
               className="flex-1 text-base py-3 px-4 border-border focus:border-primary ring-offset-background focus:ring-ring focus-visible:ring-2"
-              disabled={isLoading}
+              disabled={isLoading || awaitingSubmitChoice}
             />
             <Button
               onClick={handleSendMessage}
-              disabled={isLoading || !userInput.trim()}
+              disabled={isLoading || awaitingSubmitChoice || !userInput.trim()}
               className="px-6 py-3 text-base bg-primary hover:bg-primary/90 text-primary-foreground"
               aria-label="Gửi tin nhắn"
             >
@@ -515,11 +552,15 @@ export default function BookingRoomPage() {
       {activeWorkflow && showBookingForm && (
         <div className="flex flex-col max-w-2xl shadow-2xl rounded-lg overflow-hidden border-primary/20 mx-auto my-auto">
           <BookingDetailsForm
-            initialDetails={currentBookingDetails}
+            values={fieldValues}
             workflowConfig={activeWorkflow}
+            onFieldChange={(name, value) =>
+              setFieldValues((prev) => setFieldValue(prev, name, value))
+            }
             onSubmit={handleConfirmBooking}
             onCancel={() => setShowBookingForm(false)}
             isLoading={isLoading}
+            locked={awaitingSubmitChoice}
           />
         </div>
       )}
