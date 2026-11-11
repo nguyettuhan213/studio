@@ -1,20 +1,11 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { collection, query, where, getDocs } from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import { observeAuthState } from "@/services/auth-service";
+import { observeAuthState } from "@/lib/auth-service";
+import { api } from "@/lib/api-client";
+import type { FlowTrackingData } from "@/types/api";
 import { User } from "firebase/auth";
 import { SidebarNavigation } from "@/components/navigation/sidebar";
-interface FlowTrackingData {
-  flowId?: string;
-  status?: string;
-  owner?: string;
-  timestamp?: number;
-  startAt?: number;
-  step?: number;
-  details?: any;
-}
 
 const DashboardPage: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -27,16 +18,8 @@ const DashboardPage: React.FC = () => {
     const fetchFlowData = async () => {
       if (user?.email) {
         try {
-          const q = query(
-            collection(db, "flowTracking"),
-            where("owner", "==", user?.email)
-          );
-          const querySnapshot = await getDocs(q);
-          const data = querySnapshot.docs.map(
-            (doc) => doc.data() as FlowTrackingData
-          );
-          console.log(data);
-          setFlowData(data);
+          // Backend scopes the query to the verified token's email
+          setFlowData(await api.getFlows());
         } catch (error) {
           console.error("Error fetching flow tracking data:", error);
         } finally {
