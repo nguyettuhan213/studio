@@ -72,4 +72,34 @@ export const api = {
   submitRequest: (body: SubmitRequestBody) =>
     request<SubmitRequestResponse>('/requests', 'POST', body),
   getFlows: () => request<FlowTrackingData[]>('/flows'),
+  downloadFile,
 };
+
+/**
+ * Downloads a generated file. `downloadUrl` comes from the backend ("/api/files/<id>"); links are
+ * anonymous and expire server-side. fetch + blob so expired/missing files surface as an ApiError.
+ */
+async function downloadFile(downloadUrl: string, fileName: string): Promise<void> {
+  if (!/^\/api\/files\/[0-9a-f-]{36}$/.test(downloadUrl)) {
+    throw new ApiError(0, 'INVALID_URL', 'Liên kết tải tệp không hợp lệ.');
+  }
+  let res: Response;
+  try {
+    res = await fetch(downloadUrl);
+  } catch {
+    throw new ApiError(0, 'NETWORK_ERROR', 'Không thể kết nối tới máy chủ. Vui lòng thử lại.');
+  }
+  if (!res.ok) {
+    const err = ((await res.json().catch(() => null)) as ApiErrorBody | null)?.error;
+    throw new ApiError(res.status, err?.code ?? 'UNKNOWN', err?.message ?? `Tải tệp thất bại (HTTP ${res.status}).`);
+  }
+
+  const url = URL.createObjectURL(await res.blob());
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}

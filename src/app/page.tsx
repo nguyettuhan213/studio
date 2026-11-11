@@ -49,7 +49,8 @@ import AuthModal from "@/components/auth/auth-modal";
 import { SidebarNavigation } from "@/components/navigation/sidebar";
 import { observeAuthState, signout } from "@/lib/auth-service";
 import { api, ApiError } from "@/lib/api-client";
-import type { ApiWorkflow } from "@/types/api";
+import type { ApiWorkflow, SubmitActionsReport } from "@/types/api";
+import SubmissionResults from "@/components/booking-room/submission-results";
 import {
   activeValues,
   buildSubmission,
@@ -68,6 +69,8 @@ interface ChatMessage {
   sender: "user" | "ai";
   text: string;
   timestamp: Date;
+  /** Post-submission action results, shown under the submission's message. */
+  actions?: SubmitActionsReport;
 }
 
 export default function BookingRoomPage() {
@@ -131,17 +134,21 @@ export default function BookingRoomPage() {
     scrollToBottom();
   }, [messages, scrollToBottom]);
 
-  const addMessage = useCallback((sender: "user" | "ai", text: string) => {
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: Date.now().toString() + Math.random(),
-        sender,
-        text,
-        timestamp: new Date(),
-      },
-    ]);
-  }, []);
+  const addMessage = useCallback(
+    (sender: "user" | "ai", text: string, actions?: SubmitActionsReport) => {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString() + Math.random(),
+          sender,
+          text,
+          timestamp: new Date(),
+          actions,
+        },
+      ]);
+    },
+    []
+  );
 
   const fetchInitialMessageAndFocus = useCallback(() => {
     addMessage("ai", INITIAL_BOT_MESSAGE);
@@ -287,7 +294,11 @@ export default function BookingRoomPage() {
         workflowId: activeWorkflow.id,
         details: detailsToConfirm,
       });
-      addMessage("ai", result.aiMessage);
+      addMessage(
+        "ai",
+        result.aiMessage,
+        result.actions?.results?.length ? result.actions : undefined
+      );
       addMessage(
         "ai",
         "Bạn muốn làm gì tiếp theo? Chọn \"Giữ dữ liệu và tiếp tục\" để giữ toàn bộ thông tin đã nhập, hoặc \"Xóa dữ liệu và bắt đầu lại\" để bắt đầu phiên mới."
@@ -465,12 +476,14 @@ export default function BookingRoomPage() {
             ref={scrollAreaRef}
           >
             {messages.map((msg) => (
-              <ChatMessageItem
-                key={msg.id}
-                sender={msg.sender}
-                text={msg.text}
-                timestamp={msg.timestamp}
-              />
+              <React.Fragment key={msg.id}>
+                <ChatMessageItem
+                  sender={msg.sender}
+                  text={msg.text}
+                  timestamp={msg.timestamp}
+                />
+                {msg.actions && <SubmissionResults report={msg.actions} />}
+              </React.Fragment>
             ))}
             {isLoading &&
               messages.length > 0 &&
